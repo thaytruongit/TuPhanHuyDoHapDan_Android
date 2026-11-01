@@ -1,11 +1,16 @@
 package com.example
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +26,6 @@ import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.HourglassBottom
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material3.Badge
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,21 +39,17 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.ScreenDecayRepository
 import com.example.hardware.HardwareManager
-import com.example.model.AgeGroup
 import com.example.ui.ScreenDecayViewModel
 import com.example.ui.components.BearSleepDialog
 import com.example.ui.components.MovementStationDialog
@@ -60,6 +60,8 @@ import com.example.ui.screens.ScienceScreen
 import com.example.ui.screens.SensorLabScreen
 import com.example.ui.screens.SimulatorScreen
 import com.example.ui.theme.MyApplicationTheme
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 enum class MainTab(
     val title: String,
@@ -73,28 +75,87 @@ enum class MainTab(
     PARENT("Phụ Huynh", Icons.Filled.Security, Icons.Outlined.Security, "tab_parent")
 }
 
-class MainActivity : ComponentActivity() {
+/**
+ * MainActivity triển khai SensorEventListener để lắng nghe cảm biến gia tốc (Accelerometer)
+ * phát hiện các thay đổi gia tốc vượt ngưỡng Δa > 6.5 m/s² nhằm hỗ trợ cơ chế 'Trạm vận động'
+ * cho nhóm 7-9 tuổi, đồng thời kết nối với ScreenDecayViewModel để điều phối 3 nhóm tuổi (3-6, 7-9, 10-12).
+ */
+class MainActivity : ComponentActivity(), SensorEventListener {
+
+    companion object {
+        const val ACCELERATION_THRESHOLD = 6.5f
+    }
+
+    private lateinit var sensorManager: SensorManager
+    private var accelerometerSensor: Sensor? = null
+
+    private val repository by lazy { ScreenDecayRepository(applicationContext) }
+    private val hardwareManager by lazy { HardwareManager(applicationContext) }
+
+    private val viewModel: ScreenDecayViewModel by viewModels {
+        ScreenDecayViewModel.provideFactory(repository, hardwareManager)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Khởi tạo dịch vụ cảm biến gia tốc (Sensor.TYPE_ACCELEROMETER)
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        viewModel.attachActivity(this)
+
         setContent {
             MyApplicationTheme {
-                MainAppContainer(activity = this)
+                MainAppContainer(
+                    activity = this,
+                    viewModel = viewModel
+                )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Đăng ký lắng nghe cảm biến gia tốc khi Activity hoạt động
+        accelerometerSensor?.let { sensor ->
+            sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Hủy đăng ký cảm biến khi Activity tạm dừng để tiết kiệm pin
+        sensorManager.unregisterListener(this)
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+
+            // Tính độ lớn gia tốc tổng hợp và độ lệch so với gia tốc trọng trường chuẩn (9.81 m/s²)
+            val magnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+            val deltaA = abs(magnitude - SensorManager.GRAVITY_EARTH)
+
+            // Chuyển biến thiên gia tốc sang ViewModel; khi Δa > 6.5 m/s² sẽ kích hoạt đếm nhịp ở Trạm vận động (nhóm 7-9 tuổi)
+            viewModel.onAccelerometerChanged(deltaA)
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Không yêu cầu xử lý thay đổi độ chính xác
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppContainer(activity: ComponentActivity) {
-    val context = LocalContext.current
-    val repository = remember { ScreenDecayRepository(context) }
-    val hardwareManager = remember { HardwareManager(context) }
-    val viewModel = remember { ScreenDecayViewModel(repository, hardwareManager) }
-
+fun MainAppContainer(
+    activity: ComponentActivity,
+    viewModel: ScreenDecayViewModel
+) {
     LaunchedEffect(activity) {
         viewModel.attachActivity(activity)
     }
@@ -186,17 +247,9 @@ fun MainAppContainer(activity: ComponentActivity) {
                         onToggleRunning = { viewModel.toggleRunning() },
                         onReset = { viewModel.resetSession() },
                         onSetSpeed = { viewModel.setSpeedMultiplier(it) },
-                        onPlayLullabyPreview = { viewModel.startSession() },
-                        onTriggerMovementStationDirectly = {
-                            viewModel.hardwareManager.startListeningAccelerometer(config.accelerometerThreshold)
-                            // Switch to primary and simulate completion
-                            viewModel.setAgeGroup(AgeGroup.PRIMARY)
-                            viewModel.startSession()
-                        },
-                        onTriggerReflectionDirectly = {
-                            viewModel.setAgeGroup(AgeGroup.MIDDLE_SCHOOL)
-                            viewModel.startSession()
-                        }
+                        onPlayLullabyPreview = { viewModel.activateBedtimeDirectly() },
+                        onTriggerMovementStationDirectly = { viewModel.activateMovementStationDirectly() },
+                        onTriggerReflectionDirectly = { viewModel.activateReflectionDirectly() }
                     )
                 }
                 MainTab.SENSOR_LAB -> {
@@ -221,9 +274,7 @@ fun MainAppContainer(activity: ComponentActivity) {
                 }
             }
 
-            // MODALS & SCIENTIFIC MECHANISM DIALOGS
-
-            // 1. Nhóm 1: Cơ chế Bạn Gấu Đi Ngủ (Mầm non 3-6)
+            // 1. Nhóm 1 (3-6 tuổi): Cơ chế Bạn Gấu Đi Ngủ
             if (sessionState.isBedtimeOverlayVisible) {
                 BearSleepDialog(
                     onDismiss = { viewModel.dismissBedtimeOverlay() },
@@ -231,7 +282,7 @@ fun MainAppContainer(activity: ComponentActivity) {
                 )
             }
 
-            // 2. Nhóm 2: Cơ chế Hạ nhiệt thị giác & Trạm vận động (Tiểu học 7-9)
+            // 2. Nhóm 2 (7-9 tuổi): Cơ chế Hạ nhiệt thị giác & Trạm vận động (Δa > 6.5 m/s²)
             if (sessionState.isMovementStationActive) {
                 MovementStationDialog(
                     currentDeltaA = deltaA,
@@ -243,7 +294,7 @@ fun MainAppContainer(activity: ComponentActivity) {
                 )
             }
 
-            // 3. Nhóm 3: Cơ chế Ma sát nhận thức & Phản tư chống dán (Lớp 5-7 10-12)
+            // 3. Nhóm 3 (10-12 tuổi): Cơ chế Ma sát nhận thức & Phản tư chống dán
             if (sessionState.isReflectionActive) {
                 ReflectionFrictionDialog(
                     targetSentence = config.reflectionSentence,
@@ -252,7 +303,7 @@ fun MainAppContainer(activity: ComponentActivity) {
                 )
             }
 
-            // Parental PIN Override Dialog
+            // Xác thực Mã PIN Phụ Huynh (SHA-256)
             if (showParentPinModal) {
                 ParentPinDialog(
                     onDismiss = { showParentPinModal = false },

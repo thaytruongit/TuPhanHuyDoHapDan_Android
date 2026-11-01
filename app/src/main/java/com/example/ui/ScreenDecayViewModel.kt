@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.app.Activity
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.ScreenDecayRepository
 import com.example.hardware.HardwareManager
@@ -13,17 +14,36 @@ import com.example.util.CryptoUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/**
+ * ViewModel theo dõi thời gian sử dụng màn hình của người dùng và kích hoạt
+ * các trạng thái logic tự phân hủy độ hấp dẫn cho từng nhóm độ tuổi:
+ * - Nhóm 1 (3-6 tuổi): Trình duyệt buồn ngủ – Bạn Gấu đi ngủ (Sepia, sáng 68%, âm lượng 12%, dừng ở phút 15)
+ * - Nhóm 2 (7-9 tuổi): Hạ nhiệt thị giác & Trạm vận động (Làm mờ gợi ý, đếm 10 nhịp vươn vai khi Δa > 6.5 m/s² ở phút 25)
+ * - Nhóm 3 (10-12 tuổi): Ma sát nhận thức & Phản tư (Thang độ xám 100%, trễ cuộn 900ms, SHA-256 & gõ phản tư chống dán ở phút 30)
+ */
 class ScreenDecayViewModel(
     private val repository: ScreenDecayRepository,
     val hardwareManager: HardwareManager
 ) : ViewModel() {
+
+    companion object {
+        const val ACCELERATION_THRESHOLD_MS2 = 6.5f
+
+        fun provideFactory(
+            repository: ScreenDecayRepository,
+            hardwareManager: HardwareManager
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return ScreenDecayViewModel(repository, hardwareManager) as T
+            }
+        }
+    }
 
     val config: StateFlow<ParentalConfig> = repository.config
     val activityLogs: StateFlow<List<ActivityRecord>> = repository.activityLogs
@@ -34,17 +54,16 @@ class ScreenDecayViewModel(
     private val _isParentUnlocked = MutableStateFlow(false)
     val isParentUnlocked: StateFlow<Boolean> = _isParentUnlocked.asStateFlow()
 
-    val currentDeltaA = hardwareManager.currentDeltaA
-    val stretchReps = hardwareManager.repCount
+    val currentDeltaA: StateFlow<Float> = hardwareManager.currentDeltaA
+    val stretchReps: StateFlow<Int> = hardwareManager.repCount
 
     private var timerJob: Job? = null
     private var attachedActivity: Activity? = null
 
     init {
-        // Apply initial target minutes from config
         updateTargetMinutesForCurrentGroup()
 
-        // Sync stretch reps from hardware manager
+        // Đồng bộ số nhịp vươn vai từ cảm biến gia tốc (Δa > 6.5 m/s²)
         viewModelScope.launch {
             hardwareManager.repCount.collect { reps ->
                 val current = _sessionState.value
@@ -54,10 +73,31 @@ class ScreenDecayViewModel(
                 }
             }
         }
+
+        // Đồng bộ biến thiên gia tốc tức thời vào SessionState
+        viewModelScope.launch {
+            hardwareManager.currentDeltaA.collect { delta ->
+                _sessionState.value = _sessionState.value.copy(currentAccelerationDelta = delta)
+            }
+        }
     }
 
     fun attachActivity(activity: Activity) {
         attachedActivity = activity
+    }
+
+    /**
+     * Nhận dữ liệu cảm biến gia tốc từ Activity khi có thay đổi gia tốc,
+     * kiểm tra vượt ngưỡng 6.5 m/s² để hỗ trợ cơ chế 'Trạm vận động' cho nhóm 7-9 tuổi.
+     */
+    fun onAccelerometerChanged(deltaA: Float) {
+        val current = _sessionState.value
+        val threshold = config.value.accelerometerThreshold.takeIf { it > 0f } ?: ACCELERATION_THRESHOLD_MS2
+        hardwareManager.processAccelerationDelta(
+            delta = deltaA,
+            threshold = threshold,
+            forceCount = current.isMovementStationActive
+        )
     }
 
     fun setAgeGroup(group: AgeGroup) {
@@ -106,7 +146,6 @@ class ScreenDecayViewModel(
 
     fun startSession() {
         if (_sessionState.value.progress >= 1f) {
-            // Already finished, restart
             _sessionState.value = _sessionState.value.copy(
                 elapsedSeconds = 0f,
                 isBedtimeOverlayVisible = false,
@@ -128,10 +167,9 @@ class ScreenDecayViewModel(
                 val speed = current.speedMultiplier
                 val newElapsed = current.elapsedSeconds + (stepSeconds * speed)
 
-                // Compute real-time decay parameters
                 val progress = (newElapsed / current.totalSeconds).coerceIn(0f, 1f)
 
-                // For Toddler: brightness drops gradually from 100% to 68% at minute 15
+                // Nhóm 1 (3-6 tuổi): Độ sáng giảm dần từ 100% về 68% ở phút 15
                 val newBrightness = if (current.ageGroup == AgeGroup.TODDLER) {
                     (100 - (32 * progress)).toInt().coerceIn(68, 100)
                 } else {
@@ -141,7 +179,6 @@ class ScreenDecayViewModel(
                 hardwareManager.applyWindowBrightness(attachedActivity, newBrightness)
 
                 if (newElapsed >= current.totalSeconds) {
-                    // Reached the target minute! Trigger the age-specific mechanism
                     onSessionLimitReached(current.ageGroup)
                     break
                 } else {
@@ -181,11 +218,14 @@ class ScreenDecayViewModel(
         _sessionState.value = _sessionState.value.copy(speedMultiplier = multiplier)
     }
 
+    /**
+     * Kích hoạt trạng thái logic đặc thù cho từng nhóm độ tuổi (3-6, 7-9, 10-12) khi đạt ngưỡng thời gian
+     */
     private fun onSessionLimitReached(group: AgeGroup) {
         val current = _sessionState.value
         when (group) {
             AgeGroup.TODDLER -> {
-                // Nhóm 1: Cơ chế Bạn Gấu đi ngủ, Sepia, sáng 68%, âm lượng 12%, dừng ở phút 15
+                // Nhóm 1 (3-6 tuổi): Cơ chế Bạn Gấu đi ngủ, Sepia, sáng 68%, âm lượng 12%, dừng ở phút 15
                 _sessionState.value = current.copy(
                     isRunning = false,
                     elapsedSeconds = current.totalSeconds,
@@ -204,7 +244,8 @@ class ScreenDecayViewModel(
                 )
             }
             AgeGroup.PRIMARY -> {
-                // Nhóm 2: Cơ chế Hạ nhiệt thị giác & Trạm vận động (Δa > 6.5 m/s² ở phút 25)
+                // Nhóm 2 (7-9 tuổi): Cơ chế Hạ nhiệt thị giác & Trạm vận động (Δa > 6.5 m/s² ở phút 25)
+                hardwareManager.resetRepCount()
                 _sessionState.value = current.copy(
                     isRunning = false,
                     elapsedSeconds = current.totalSeconds,
@@ -215,7 +256,7 @@ class ScreenDecayViewModel(
                 hardwareManager.startListeningAccelerometer(config.value.accelerometerThreshold)
             }
             AgeGroup.MIDDLE_SCHOOL -> {
-                // Nhóm 3: Cơ chế Ma sát nhận thức & Phản tư (Thang độ xám 100%, trễ cuộn 900ms, phản tư ở phút 30)
+                // Nhóm 3 (10-12 tuổi): Cơ chế Ma sát nhận thức & Phản tư (Thang độ xám 100%, trễ cuộn 900ms, phản tư ở phút 30)
                 _sessionState.value = current.copy(
                     isRunning = false,
                     elapsedSeconds = current.totalSeconds,
@@ -241,6 +282,21 @@ class ScreenDecayViewModel(
                 notes = "Đã hoàn thành xuất sắc 10 nhịp vươn vai qua cảm biến gia tốc (Δa > 6.5 m/s²)."
             )
         )
+    }
+
+    fun activateMovementStationDirectly() {
+        setAgeGroup(AgeGroup.PRIMARY)
+        onSessionLimitReached(AgeGroup.PRIMARY)
+    }
+
+    fun activateReflectionDirectly() {
+        setAgeGroup(AgeGroup.MIDDLE_SCHOOL)
+        onSessionLimitReached(AgeGroup.MIDDLE_SCHOOL)
+    }
+
+    fun activateBedtimeDirectly() {
+        setAgeGroup(AgeGroup.TODDLER)
+        onSessionLimitReached(AgeGroup.TODDLER)
     }
 
     fun dismissBedtimeOverlay() {
@@ -275,7 +331,6 @@ class ScreenDecayViewModel(
         val isValid = CryptoUtils.verifyPin(inputPin, config.value.pinSha256)
         if (isValid) {
             _isParentUnlocked.value = true
-            // Also dismiss any blocking dialog if parent overrides
             _sessionState.value = _sessionState.value.copy(
                 isBedtimeOverlayVisible = false,
                 isMovementStationActive = false,
@@ -301,7 +356,6 @@ class ScreenDecayViewModel(
         repository.updatePin(newPin)
     }
 
-    // Manual increment for testing or when accelerometer sensor is simulated on non-physical device
     fun simulateManualRep() {
         val newCount = _sessionState.value.stretchRepsDone + 1
         _sessionState.value = _sessionState.value.copy(stretchRepsDone = newCount)
