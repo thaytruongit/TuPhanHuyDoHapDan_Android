@@ -4,10 +4,14 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.ScreenDecayRepository
 import com.example.hardware.HardwareManager
+import com.example.hardware.NotificationHelper
 import com.example.model.AgeGroup
+import com.example.model.DecayLevelMode
+import com.example.model.TargetPlatform
 import com.example.ui.ScreenDecayViewModel
 import com.example.util.CryptoUtils
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,18 +26,39 @@ class ExampleRobolectricTest {
     fun `read string from context`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
-        assertEquals("Hạ Nhiệt Màn Hình", appName)
+        assertEquals("Tự Phân Hủy Độ Hấp Dẫn", appName)
     }
 
     @Test
-    fun `verify sha256 pin and age group thresholds`() {
+    fun `verify sha256 pin, age group thresholds, 4 target platforms and 4 decay levels`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repository = ScreenDecayRepository(context)
         val hardwareManager = HardwareManager(context)
-        val viewModel = ScreenDecayViewModel(repository, hardwareManager)
+        val notificationHelper = NotificationHelper(context)
+        val viewModel = ScreenDecayViewModel(repository, hardwareManager, notificationHelper)
 
         // Default PIN "1234" verification
         assertTrue(CryptoUtils.verifyPin("1234", viewModel.config.value.pinSha256))
+
+        // Verify all 4 target platforms are enabled by default
+        assertEquals(4, viewModel.sessionState.value.enabledTargets.size)
+        assertTrue(viewModel.sessionState.value.enabledTargets.contains(TargetPlatform.YOUTUBE_SHORTS))
+        assertTrue(viewModel.sessionState.value.enabledTargets.contains(TargetPlatform.TIKTOK_WEB))
+        assertTrue(viewModel.sessionState.value.enabledTargets.contains(TargetPlatform.FACEBOOK_REELS))
+        assertTrue(viewModel.sessionState.value.enabledTargets.contains(TargetPlatform.WEB_GAME))
+
+        // Verify 4 decay levels in KHKT Demo Mode
+        viewModel.selectDecayLevelMode(DecayLevelMode.LEVEL_0)
+        assertEquals(0, viewModel.sessionState.value.currentDecayLevel)
+        assertFalse(viewModel.sessionState.value.hideLikeAndViewCounts)
+
+        viewModel.selectDecayLevelMode(DecayLevelMode.LEVEL_2)
+        assertEquals(2, viewModel.sessionState.value.currentDecayLevel)
+        assertTrue(viewModel.sessionState.value.hideLikeAndViewCounts)
+
+        viewModel.selectDecayLevelMode(DecayLevelMode.LEVEL_3)
+        assertEquals(3, viewModel.sessionState.value.currentDecayLevel)
+        assertEquals(900L, viewModel.sessionState.value.infiniteScrollDelayMs)
 
         // Age group 1 (3-6): 15 minutes
         viewModel.setAgeGroup(AgeGroup.TODDLER)

@@ -1,15 +1,10 @@
 package com.example.ui.components
 
 import android.os.Build
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Paint
@@ -22,13 +17,20 @@ object VisualDecayHelper {
 
     /**
      * Tạo ColorFilter theo trạng thái suy giảm của từng nhóm tuổi:
-     * - Nhóm 1: Tông vàng ấm Sepia tăng dần
-     * - Nhóm 3: Thang độ xám (Grayscale) 100% theo Holte & Ferraro 2020 & PMC10159421
+     * - Nhóm 1 (3-6t): Tông vàng ấm Sepia tăng dần
+     * - Nhóm 2 (7-9t): Hạ nhiệt thị giác & giảm độ rực màu
+     * - Nhóm 3 (10-12t): Thang độ xám (Grayscale) 100% về trắng đen theo Holte & Ferraro 2020 & PMC10159421
+     * Hỗ trợ miễn giảm làm xám cho bài giảng học tập YouTube (isExempted = true).
      */
-    fun createDecayColorFilter(ageGroup: AgeGroup, progress: Float): ColorFilter? {
+    fun createDecayColorFilter(
+        ageGroup: AgeGroup,
+        progress: Float,
+        isExempted: Boolean = false
+    ): ColorFilter? {
+        if (isExempted || progress <= 0.01f) return null
+
         return when (ageGroup) {
             AgeGroup.TODDLER -> {
-                // Tông Sepia tăng dần theo thời gian (0f -> 1f)
                 val s = progress.coerceIn(0f, 1f)
                 val sepiaArray = floatArrayOf(
                     0.393f * s + (1f - s), 0.769f * s,             0.189f * s,             0f, 0f,
@@ -39,15 +41,13 @@ object VisualDecayHelper {
                 ColorFilter.colorMatrix(ColorMatrix(sepiaArray))
             }
             AgeGroup.MIDDLE_SCHOOL -> {
-                // Thang độ xám 100% (Saturation chuyển từ 1.0 về 0.0)
                 val sat = (1f - progress).coerceIn(0f, 1f)
                 val matrix = ColorMatrix()
                 matrix.setToSaturation(sat)
                 ColorFilter.colorMatrix(matrix)
             }
             AgeGroup.PRIMARY -> {
-                // Giảm nhẹ độ bão hòa màu để hạ nhiệt thị giác
-                val sat = (1f - (progress * 0.45f)).coerceIn(0.55f, 1f)
+                val sat = (1f - (progress * 0.85f)).coerceIn(0.15f, 1f)
                 val matrix = ColorMatrix()
                 matrix.setToSaturation(sat)
                 ColorFilter.colorMatrix(matrix)
@@ -56,11 +56,34 @@ object VisualDecayHelper {
     }
 
     /**
-     * Tính độ mờ (Blur) của các thành phần gợi ý hấp dẫn cho Nhóm 2 (Hạ nhiệt thị giác)
+     * Tính độ mờ (Blur) của các thành phần gợi ý hấp dẫn
      */
-    fun calculateVisualCoolDownBlur(progress: Float): Dp {
-        // Blur tăng từ 0.dp đến 16.dp khi sắp đến phút thứ 25
+    fun calculateVisualCoolDownBlur(progress: Float, isExempted: Boolean = false): Dp {
+        if (isExempted) return 0.dp
         return (progress * 16f).dp
+    }
+}
+
+/**
+ * Modifier áp dụng trực tiếp bộ lọc màu (Trắng đen 100% / Sepia / Hạ nhiệt màu) lên toàn bộ vùng giao diện
+ */
+fun Modifier.applyScreenDecayEffect(
+    ageGroup: AgeGroup,
+    progress: Float,
+    isExempted: Boolean = false
+): Modifier = this.drawWithContent {
+    val filter = VisualDecayHelper.createDecayColorFilter(ageGroup, progress, isExempted)
+    if (filter == null) {
+        drawContent()
+    } else {
+        drawIntoCanvas { canvas ->
+            val paint = Paint().apply {
+                colorFilter = filter
+            }
+            canvas.saveLayer(Rect(0f, 0f, size.width, size.height), paint)
+            drawContent()
+            canvas.restore()
+        }
     }
 }
 

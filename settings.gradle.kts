@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Hạ Nhiệt Màn Hình"
+rootProject.name = "Tự Phân Hủy Độ Hấp Dẫn"
 
 include(":app")

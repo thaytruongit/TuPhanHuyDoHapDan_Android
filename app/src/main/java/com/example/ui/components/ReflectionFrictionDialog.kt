@@ -2,7 +2,6 @@ package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,12 +18,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,7 +47,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +65,6 @@ fun ReflectionFrictionDialog(
     var pasteWarning by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Normalized match ratio
     val matchRatio = remember(typedText, targetSentence) {
         val targetNorm = targetSentence.trim().lowercase()
         val userNorm = typedText.trim().lowercase()
@@ -92,7 +89,7 @@ fun ReflectionFrictionDialog(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF121212)), // Strict Grayscale dark background
+                .background(Color(0xFF121212)),
             color = Color.Transparent
         ) {
             Column(
@@ -103,7 +100,6 @@ fun ReflectionFrictionDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Psychology badge
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -119,10 +115,10 @@ fun ReflectionFrictionDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "MA SÁT NHẬN THỨC & PHẢN TƯ",
+                    text = "CƠ CHẾ MA SÁT NHẬN THỨC",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White,
@@ -132,7 +128,7 @@ fun ReflectionFrictionDialog(
                 )
 
                 Text(
-                    text = "Cơ chế: Thang độ xám 100% & Trễ cuộn 900ms (Phút 30)",
+                    text = "Nhóm 10–12 tuổi: Đạt giới hạn 30 phút sử dụng màn hình",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = Color(0xFFAAAAAA)
                     ),
@@ -140,52 +136,60 @@ fun ReflectionFrictionDialog(
                     modifier = Modifier.padding(top = 4.dp)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Scientific basis citation
+                // 4 Trụ cột Ma sát nhận thức
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                    modifier = Modifier.fillMaxWidth(0.95f)
+                    modifier = Modifier.fillMaxWidth(0.96f)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Science,
-                            contentDescription = null,
-                            tint = Color(0xFFDDDDDD),
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Nghiên cứu Holte & Ferraro (2020) & PubMed PMC10159421 chứng minh: Thang độ xám 100% triệt tiêu thụ cảm dopamine ở não, giúp thanh thiếu niên dễ dàng thoát khỏi vòng lặp vô thức.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color(0xFFCCCCCC),
-                                lineHeight = 18.sp
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Target quote card
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF262626)),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(Color(0xFF666666), Color(0xFF999999)))),
-                    modifier = Modifier.fillMaxWidth(0.95f)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "CÂU TÂM NIỆM PHẢN TƯ CẦN GÕ:",
+                            text = "TRẠNG THÁI TỰ PHÂN HỦY ĐỘ HẤP DẪN (MỨC 4):",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = Color(0xFF888888),
+                                color = Color(0xFFBBBBBB),
                                 fontWeight = FontWeight.Bold
                             )
                         )
+                        FrictionCheckRow("Đã ẩn toàn bộ số Like / View / Thông báo đỏ gây nghiện")
+                        FrictionCheckRow("Giảm độ bão hòa màu về Trắng Đen 100% (Holte & Ferraro, 2020)")
+                        FrictionCheckRow("Làm trễ cuộn vô tận (900 ms) cắt đứt vòng lặp lướt vô thức")
+                        FrictionCheckRow("Yêu cầu tự tay gõ Mục tiêu học tập (Chống sao chép/dán)")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Target Learning Goal / Reflection Sentence
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF262626)),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = Brush.horizontalGradient(listOf(Color(0xFF666666), Color(0xFF999999)))
+                    ),
+                    modifier = Modifier.fillMaxWidth(0.96f)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.School,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "MỤC TIÊU HỌC TẬP MẪU CẦN GÕ:",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = Color(0xFFCCCCCC),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "“$targetSentence”",
@@ -198,24 +202,23 @@ fun ReflectionFrictionDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Anti-paste text input
+                // Anti-paste text input for learning goal
                 OutlinedTextField(
                     value = typedText,
                     onValueChange = { newText ->
-                        // Anti-paste mechanism: if user suddenly pastes > 3 chars
                         val deltaLen = newText.length - typedText.length
                         if (deltaLen > 3) {
-                            pasteWarning = "Tính năng chống dán (Anti-paste) đã kích hoạt! Bạn phải tự tay gõ từng từ để kích thích thùy trán trước."
+                            pasteWarning = "⚠️ Chống dán (Anti-paste) đã chặn thao tác dán! Hãy tự gõ từng chữ mục tiêu học tập của em."
                         } else {
                             pasteWarning = null
                             errorMessage = null
                             typedText = newText
                         }
                     },
-                    label = { Text("Tự tay gõ câu suy ngẫm vào đây (chống dán)") },
-                    placeholder = { Text("Gõ chính xác từng ký tự...") },
+                    label = { Text("Gõ mục tiêu học tập của em (chống dán)") },
+                    placeholder = { Text("Gõ mục tiêu học tập cụ thể (tối thiểu 20 ký tự)...") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color(0xFFE0E0E0),
@@ -225,35 +228,34 @@ fun ReflectionFrictionDialog(
                         unfocusedLabelColor = Color(0xFFAAAAAA)
                     ),
                     modifier = Modifier
-                        .fillMaxWidth(0.95f)
+                        .fillMaxWidth(0.96f)
                         .testTag("reflection_input_field"),
                     maxLines = 4,
                     shape = RoundedCornerShape(14.dp)
                 )
 
-                // Match progress bar
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(0.95f),
+                    modifier = Modifier.fillMaxWidth(0.96f),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Độ chính xác: ${(matchRatio * 100).toInt()}%",
+                        text = "Tiến độ hoàn thành mục tiêu: ${minOf(100, (typedText.length * 100) / maxOf(20, targetSentence.length))}%",
                         style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFAAAAAA))
                     )
                     Text(
-                        text = "${typedText.length}/${targetSentence.length} ký tự",
+                        text = "${typedText.length} ký tự (Tối thiểu 20)",
                         style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFAAAAAA))
                     )
                 }
 
                 LinearProgressIndicator(
-                    progress = { matchRatio },
+                    progress = { (typedText.length.toFloat() / 20f).coerceIn(0f, 1f) },
                     color = Color.White,
                     trackColor = Color(0xFF333333),
                     modifier = Modifier
-                        .fillMaxWidth(0.95f)
+                        .fillMaxWidth(0.96f)
                         .padding(top = 4.dp)
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp))
@@ -281,13 +283,13 @@ fun ReflectionFrictionDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Button(
                     onClick = {
                         val success = onSubmitReflection(typedText)
                         if (!success) {
-                            errorMessage = "Câu gõ chưa khớp với câu tâm niệm. Vui lòng hoàn thành chính xác để mở khóa."
+                            errorMessage = "Vui lòng tự tay gõ mục tiêu học tập cụ thể (ít nhất 20 ký tự) hoặc khớp với câu mẫu."
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -296,14 +298,14 @@ fun ReflectionFrictionDialog(
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
-                        .fillMaxWidth(0.95f)
+                        .fillMaxWidth(0.96f)
                         .height(50.dp)
                         .testTag("submit_reflection_button")
                 ) {
                     Icon(imageVector = Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Xác Nhận Đã Phản Tư & Rời Màn Hình",
+                        text = "Xác Nhận Mục Tiêu Học Tập & Hoàn Tất",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
@@ -318,7 +320,7 @@ fun ReflectionFrictionDialog(
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
-                        .fillMaxWidth(0.95f)
+                        .fillMaxWidth(0.96f)
                         .testTag("reflection_parent_pin_button")
                 ) {
                     Icon(
@@ -331,5 +333,22 @@ fun ReflectionFrictionDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FrictionCheckRow(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = Color(0xFFD4D4D4),
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFE5E5E5))
+        )
     }
 }

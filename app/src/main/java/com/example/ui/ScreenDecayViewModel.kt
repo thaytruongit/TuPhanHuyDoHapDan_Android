@@ -6,10 +6,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.ScreenDecayRepository
 import com.example.hardware.HardwareManager
+import com.example.hardware.NotificationHelper
 import com.example.model.ActivityRecord
 import com.example.model.AgeGroup
+import com.example.model.DecayLevelMode
 import com.example.model.ParentalConfig
 import com.example.model.SessionState
+import com.example.model.TargetPlatform
 import com.example.util.CryptoUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,15 +23,14 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * ViewModel theo dõi thời gian sử dụng màn hình của người dùng và kích hoạt
- * các trạng thái logic tự phân hủy độ hấp dẫn cho từng nhóm độ tuổi:
- * - Nhóm 1 (3-6 tuổi): Trình duyệt buồn ngủ – Bạn Gấu đi ngủ (Sepia, sáng 68%, âm lượng 12%, dừng ở phút 15)
- * - Nhóm 2 (7-9 tuổi): Hạ nhiệt thị giác & Trạm vận động (Làm mờ gợi ý, đếm 10 nhịp vươn vai khi Δa > 6.5 m/s² ở phút 25)
- * - Nhóm 3 (10-12 tuổi): Ma sát nhận thức & Phản tư (Thang độ xám 100%, trễ cuộn 900ms, SHA-256 & gõ phản tư chống dán ở phút 30)
+ * ViewModel theo dõi thời gian sử dụng màn hình, điều khiển hệ thống thông báo Local (Notification),
+ * giám sát chạy nền 4 nhóm mục tiêu (YouTube & Shorts, TikTok Web, Facebook & Reels, Web Game),
+ * và điều phối 4 cấp độ suy giảm (Mức 0 -> Mức 4) cho ban giám khảo KHKT.
  */
 class ScreenDecayViewModel(
     private val repository: ScreenDecayRepository,
-    val hardwareManager: HardwareManager
+    val hardwareManager: HardwareManager,
+    private val notificationHelper: NotificationHelper? = null
 ) : ViewModel() {
 
     companion object {
@@ -36,11 +38,12 @@ class ScreenDecayViewModel(
 
         fun provideFactory(
             repository: ScreenDecayRepository,
-            hardwareManager: HardwareManager
+            hardwareManager: HardwareManager,
+            notificationHelper: NotificationHelper? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return ScreenDecayViewModel(repository, hardwareManager) as T
+                return ScreenDecayViewModel(repository, hardwareManager, notificationHelper) as T
             }
         }
     }
@@ -84,6 +87,7 @@ class ScreenDecayViewModel(
 
     fun attachActivity(activity: Activity) {
         attachedActivity = activity
+        notificationHelper?.updateBackgroundMonitorNotification(_sessionState.value)
     }
 
     /**
@@ -111,16 +115,23 @@ class ScreenDecayViewModel(
             AgeGroup.MIDDLE_SCHOOL -> config.value.middleSchoolMinutes
         }
 
-        _sessionState.value = SessionState(
+        val current = _sessionState.value
+        val updated = current.copy(
             ageGroup = group,
             isRunning = false,
             elapsedSeconds = 0f,
             targetMinutes = targetMin,
-            speedMultiplier = _sessionState.value.speedMultiplier,
             brightnessPercent = 100,
-            targetStretchReps = config.value.requiredStretchReps
+            isBedtimeOverlayVisible = false,
+            isMovementStationActive = false,
+            isReflectionActive = false,
+            reflectionCompleted = false,
+            stretchRepsDone = 0,
+            lastNotifiedLevel = 0
         )
+        _sessionState.value = updated
         hardwareManager.applyWindowBrightness(attachedActivity, 100)
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
     }
 
     private fun updateTargetMinutesForCurrentGroup() {
@@ -136,6 +147,120 @@ class ScreenDecayViewModel(
         )
     }
 
+    /**
+     * Bật/tắt từng nhóm trong 4 nhóm mục tiêu kiểm soát (YouTube & Shorts, TikTok Web, Facebook & Reels, Web Game)
+     */
+    fun toggleTargetPlatform(platform: TargetPlatform) {
+        val current = _sessionState.value
+        val newSet = current.enabledTargets.toMutableSet()
+        if (newSet.contains(platform)) {
+            if (newSet.size > 1) newSet.remove(platform)
+        } else {
+            newSet.add(platform)
+        }
+        val updated = current.copy(enabledTargets = newSet)
+        _sessionState.value = updated
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
+    }
+
+    /**
+     * Chọn nền tảng hiển thị mô phỏng trực quan và chế độ bài giảng YouTube
+     */
+    fun selectPreviewPlatform(platform: TargetPlatform, isYoutubeLecture: Boolean = false) {
+        val updated = _sessionState.value.copy(
+            selectedPreviewPlatform = platform,
+            isViewingYoutubeLecture = isYoutubeLecture
+        )
+        _sessionState.value = updated
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
+    }
+
+    /**
+     * Bật/tắt chế độ "Miễn giảm làm xám cho bài giảng học tập YouTube"
+     */
+    fun toggleExemptYoutubeEducation(exempt: Boolean) {
+        val updated = _sessionState.value.copy(exemptYoutubeEducation = exempt)
+        _sessionState.value = updated
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
+    }
+
+    /**
+     * Bật/tắt chạy nền kiểm soát chặt chẽ 4 nhóm mục tiêu
+     */
+    fun toggleBackgroundMonitor(active: Boolean) {
+        val updated = _sessionState.value.copy(isBackgroundMonitorActive = active)
+        _sessionState.value = updated
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
+    }
+
+    /**
+     * Bật/tắt "⚡ Tua nhanh thời gian (1s = 30s)" trong Chế độ trình diễn giám khảo KHKT (Demo)
+     */
+    fun toggleFastForward30x(enabled: Boolean) {
+        val newSpeed = if (enabled) 30f else 1f
+        val updated = _sessionState.value.copy(
+            isFastForward30x = enabled,
+            speedMultiplier = newSpeed,
+            decayLevelMode = DecayLevelMode.AUTO
+        )
+        _sessionState.value = updated
+        if (enabled && !updated.isRunning) {
+            startSession()
+        }
+    }
+
+    /**
+     * Chọn Cấp độ suy giảm (Tự động, Mức 0, Mức 1, Mức 2, Mức 3, Mức 4) cho Ban Giám Khảo KHKT
+     */
+    fun selectDecayLevelMode(mode: DecayLevelMode) {
+        val current = _sessionState.value
+        val forcedRatio = mode.forcedProgress
+        val newElapsed = if (forcedRatio != null) {
+            current.totalSeconds * forcedRatio
+        } else {
+            current.elapsedSeconds
+        }
+        val effectiveProgress = forcedRatio ?: current.progress
+        val newBrightness = if (current.ageGroup == AgeGroup.TODDLER) {
+            (100 - (32 * effectiveProgress)).toInt().coerceIn(68, 100)
+        } else {
+            100
+        }
+
+        val updated = current.copy(
+            decayLevelMode = mode,
+            elapsedSeconds = newElapsed,
+            brightnessPercent = newBrightness
+        )
+        _sessionState.value = updated
+        hardwareManager.applyWindowBrightness(attachedActivity, newBrightness)
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
+
+        // Gửi thông báo tương ứng khi giám khảo bấm thử Mức 1..4
+        when (mode) {
+            DecayLevelMode.LEVEL_1, DecayLevelMode.LEVEL_2, DecayLevelMode.LEVEL_3 -> {
+                pauseSession()
+                val remMin = (updated.remainingSeconds / 60).coerceAtLeast(1)
+                notificationHelper?.sendDecayStageNotification(
+                    ageGroup = updated.ageGroup,
+                    level = mode.levelNumber,
+                    remainingMinutes = remMin
+                )
+            }
+            DecayLevelMode.LEVEL_4 -> {
+                pauseSession()
+                onSessionLimitReached(updated.ageGroup)
+            }
+            DecayLevelMode.LEVEL_0 -> {
+                pauseSession()
+                hardwareManager.stopLullaby()
+            }
+            DecayLevelMode.AUTO -> {
+                // Giữ nguyên hoặc tiếp tục chạy tự động
+            }
+        }
+    }
+
     fun toggleRunning() {
         if (_sessionState.value.isRunning) {
             pauseSession()
@@ -145,16 +270,21 @@ class ScreenDecayViewModel(
     }
 
     fun startSession() {
-        if (_sessionState.value.progress >= 1f) {
-            _sessionState.value = _sessionState.value.copy(
+        val initial = _sessionState.value
+        if (initial.progress >= 1f || initial.decayLevelMode == DecayLevelMode.LEVEL_4) {
+            _sessionState.value = initial.copy(
+                decayLevelMode = DecayLevelMode.AUTO,
                 elapsedSeconds = 0f,
                 isBedtimeOverlayVisible = false,
                 isMovementStationActive = false,
                 isReflectionActive = false,
                 reflectionCompleted = false,
-                stretchRepsDone = 0
+                stretchRepsDone = 0,
+                lastNotifiedLevel = 0
             )
             hardwareManager.resetRepCount()
+        } else if (initial.decayLevelMode != DecayLevelMode.AUTO) {
+            _sessionState.value = initial.copy(decayLevelMode = DecayLevelMode.AUTO)
         }
 
         _sessionState.value = _sessionState.value.copy(isRunning = true)
@@ -169,7 +299,6 @@ class ScreenDecayViewModel(
 
                 val progress = (newElapsed / current.totalSeconds).coerceIn(0f, 1f)
 
-                // Nhóm 1 (3-6 tuổi): Độ sáng giảm dần từ 100% về 68% ở phút 15
                 val newBrightness = if (current.ageGroup == AgeGroup.TODDLER) {
                     (100 - (32 * progress)).toInt().coerceIn(68, 100)
                 } else {
@@ -182,19 +311,37 @@ class ScreenDecayViewModel(
                     onSessionLimitReached(current.ageGroup)
                     break
                 } else {
-                    _sessionState.value = current.copy(
+                    val tempState = current.copy(
                         elapsedSeconds = newElapsed,
                         brightnessPercent = newBrightness
                     )
+                    val levelNow = tempState.currentDecayLevel
+                    val notifiedLevel = if (levelNow > current.lastNotifiedLevel && levelNow in 1..3) {
+                        val remMin = (tempState.remainingSeconds / 60).coerceAtLeast(1)
+                        notificationHelper?.sendDecayStageNotification(
+                            ageGroup = current.ageGroup,
+                            level = levelNow,
+                            remainingMinutes = remMin
+                        )
+                        levelNow
+                    } else {
+                        current.lastNotifiedLevel
+                    }
+
+                    val finalState = tempState.copy(lastNotifiedLevel = notifiedLevel)
+                    _sessionState.value = finalState
+                    notificationHelper?.updateBackgroundMonitorNotification(finalState)
                 }
             }
         }
     }
 
     fun pauseSession() {
-        _sessionState.value = _sessionState.value.copy(isRunning = false)
+        val updated = _sessionState.value.copy(isRunning = false)
+        _sessionState.value = updated
         timerJob?.cancel()
         hardwareManager.stopLullaby()
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
     }
 
     fun resetSession() {
@@ -202,36 +349,48 @@ class ScreenDecayViewModel(
         hardwareManager.stopListeningAccelerometer()
         hardwareManager.stopLullaby()
         hardwareManager.resetRepCount()
-        _sessionState.value = _sessionState.value.copy(
+        val updated = _sessionState.value.copy(
+            decayLevelMode = DecayLevelMode.AUTO,
             elapsedSeconds = 0f,
             isBedtimeOverlayVisible = false,
             isMovementStationActive = false,
             isReflectionActive = false,
             reflectionCompleted = false,
             stretchRepsDone = 0,
-            brightnessPercent = 100
+            brightnessPercent = 100,
+            lastNotifiedLevel = 0
         )
+        _sessionState.value = updated
         hardwareManager.applyWindowBrightness(attachedActivity, 100)
+        notificationHelper?.updateBackgroundMonitorNotification(updated)
     }
 
     fun setSpeedMultiplier(multiplier: Float) {
-        _sessionState.value = _sessionState.value.copy(speedMultiplier = multiplier)
+        _sessionState.value = _sessionState.value.copy(
+            speedMultiplier = multiplier,
+            isFastForward30x = (multiplier == 30f)
+        )
     }
 
     /**
      * Kích hoạt trạng thái logic đặc thù cho từng nhóm độ tuổi (3-6, 7-9, 10-12) khi đạt ngưỡng thời gian
+     * và phát thông báo Local (Notification) nhắc nhở trẻ.
      */
     private fun onSessionLimitReached(group: AgeGroup) {
         val current = _sessionState.value
+        notificationHelper?.sendAgeLimitReachedNotification(group, current.targetMinutes)
+
         when (group) {
             AgeGroup.TODDLER -> {
-                // Nhóm 1 (3-6 tuổi): Cơ chế Bạn Gấu đi ngủ, Sepia, sáng 68%, âm lượng 12%, dừng ở phút 15
-                _sessionState.value = current.copy(
+                val updated = current.copy(
                     isRunning = false,
                     elapsedSeconds = current.totalSeconds,
                     isBedtimeOverlayVisible = true,
-                    brightnessPercent = 68
+                    brightnessPercent = 68,
+                    lastNotifiedLevel = 4
                 )
+                _sessionState.value = updated
+                notificationHelper?.updateBackgroundMonitorNotification(updated)
                 hardwareManager.vibratePulse(300)
                 hardwareManager.startLullaby()
                 repository.logSession(
@@ -239,33 +398,43 @@ class ScreenDecayViewModel(
                         ageGroupName = "Nhóm 1 (3-6t)",
                         minutesSpent = current.targetMinutes,
                         completedSuccessfully = true,
-                        notes = "Cơ chế 'Bạn Gấu đi ngủ' tự động dừng sau ${current.targetMinutes} phút."
+                        notes = "Đạt giới hạn ${current.targetMinutes}p: Gửi Notification & bật 'Bạn Gấu đi ngủ'."
                     )
                 )
             }
             AgeGroup.PRIMARY -> {
-                // Nhóm 2 (7-9 tuổi): Cơ chế Hạ nhiệt thị giác & Trạm vận động (Δa > 6.5 m/s² ở phút 25)
                 hardwareManager.resetRepCount()
-                _sessionState.value = current.copy(
+                val updated = current.copy(
                     isRunning = false,
                     elapsedSeconds = current.totalSeconds,
                     isMovementStationActive = true,
-                    stretchRepsDone = 0
+                    stretchRepsDone = 0,
+                    lastNotifiedLevel = 4
                 )
+                _sessionState.value = updated
+                notificationHelper?.updateBackgroundMonitorNotification(updated)
                 hardwareManager.vibratePulse(250)
                 hardwareManager.startListeningAccelerometer(config.value.accelerometerThreshold)
             }
             AgeGroup.MIDDLE_SCHOOL -> {
-                // Nhóm 3 (10-12 tuổi): Cơ chế Ma sát nhận thức & Phản tư (Thang độ xám 100%, trễ cuộn 900ms, phản tư ở phút 30)
-                _sessionState.value = current.copy(
+                val updated = current.copy(
                     isRunning = false,
                     elapsedSeconds = current.totalSeconds,
                     isReflectionActive = true,
-                    reflectionCompleted = false
+                    reflectionCompleted = false,
+                    lastNotifiedLevel = 4
                 )
+                _sessionState.value = updated
+                notificationHelper?.updateBackgroundMonitorNotification(updated)
                 hardwareManager.vibratePulse(350)
             }
         }
+    }
+
+    fun sendTestNotificationNow() {
+        val current = _sessionState.value
+        notificationHelper?.sendAgeLimitReachedNotification(current.ageGroup, current.targetMinutes)
+        notificationHelper?.updateBackgroundMonitorNotification(current)
     }
 
     private fun onMovementStationCompleted() {
@@ -319,7 +488,7 @@ class ScreenDecayViewModel(
                     ageGroupName = "Nhóm 3 (10-12t)",
                     minutesSpent = _sessionState.value.targetMinutes,
                     completedSuccessfully = true,
-                    notes = "Hoàn thành phản tư ma sát nhận thức: \"$inputAnswer\""
+                    notes = "Hoàn thành gõ mục tiêu học tập (Ma sát nhận thức): \"$inputAnswer\""
                 )
             )
             return true

@@ -33,16 +33,54 @@ enum class AgeGroup(
         ageRange = "10 – 12 tuổi",
         defaultMinutes = 30,
         mechanismName = "Ma sát nhận thức & Phản tư",
-        mechanismDescription = "Thang độ xám 100% (Holte & Ferraro 2020, PMC10159421), trễ cuộn 900 ms, khóa mật khẩu SHA-256 và gõ câu phản tư chống dán ở phút 30."
+        mechanismDescription = "Ẩn số Like/View/Thông báo đỏ, giảm độ bão hòa màu về trắng đen 100%, làm trễ cuộn vô tận (900 ms) và yêu cầu gõ mục tiêu học tập chống dán ở phút 30."
     )
 }
 
+/**
+ * 4 Nhóm mục tiêu kiểm soát chạy nền
+ */
+enum class TargetPlatform(
+    val title: String,
+    val emoji: String,
+    val packageHint: String
+) {
+    YOUTUBE_SHORTS("YouTube & Shorts", "▶️", "com.google.android.youtube"),
+    TIKTOK_WEB("TikTok Web", "🎵", "com.zhiliaoapp.musically"),
+    FACEBOOK_REELS("Facebook & Reels", "📘", "com.facebook.katana"),
+    WEB_GAME("Web Game", "🎮", "web.game.portal")
+}
+
+/**
+ * Chế độ trình diễn giám khảo KHKT (Demo): Tự động hoặc chọn ngay Mức 0 -> Mức 4
+ */
+enum class DecayLevelMode(
+    val label: String,
+    val levelNumber: Int,
+    val forcedProgress: Float?,
+    val description: String
+) {
+    AUTO("Tự động", -1, null, "Tự động tăng cấp độ suy giảm theo thời gian thực tế"),
+    LEVEL_0("Mức 0", 0, 0.0f, "Mức 0 (0%): Bình thường – Hiển thị đầy đủ màu sắc, số Like/View và thông báo đỏ"),
+    LEVEL_1("Mức 1", 1, 0.28f, "Mức 1 (28%): Khởi đầu hạ nhiệt – Ẩn chấm thông báo đỏ gây xao nhãng, giảm nhẹ độ rực màu"),
+    LEVEL_2("Mức 2", 2, 0.55f, "Mức 2 (55%): Trung bình – Ẩn số Like/View, làm mờ gợi ý 8dp, bão hòa màu giảm 55%, trễ cuộn 450ms"),
+    LEVEL_3("Mức 3", 3, 0.82f, "Mức 3 (82%): Ma sát cao – Ẩn hoàn toàn Like/View/Thông báo đỏ, trắng đen 85%, trễ cuộn vô tận 900ms"),
+    LEVEL_4("Mức 4", 4, 1.0f, "Mức 4 (100%): Đạt giới hạn – Trắng đen 100%, phát Notification & kích hoạt khóa bắt buộc theo độ tuổi")
+}
+
 data class SessionState(
-    val ageGroup: AgeGroup = AgeGroup.TODDLER,
+    val ageGroup: AgeGroup = AgeGroup.MIDDLE_SCHOOL,
     val isRunning: Boolean = false,
     val elapsedSeconds: Float = 0f,
-    val targetMinutes: Int = 15,
-    val speedMultiplier: Float = 1f, // 1x, 15x, 60x for demo/testing
+    val targetMinutes: Int = 30,
+    val speedMultiplier: Float = 1f,
+    val isFastForward30x: Boolean = false, // Tua nhanh thời gian (1s = 30s)
+    val decayLevelMode: DecayLevelMode = DecayLevelMode.AUTO,
+    val enabledTargets: Set<TargetPlatform> = TargetPlatform.values().toSet(),
+    val selectedPreviewPlatform: TargetPlatform = TargetPlatform.YOUTUBE_SHORTS,
+    val exemptYoutubeEducation: Boolean = true, // Miễn giảm làm xám cho bài giảng học tập YouTube
+    val isViewingYoutubeLecture: Boolean = false, // Đang xem bài giảng học tập trên YouTube
+    val isBackgroundMonitorActive: Boolean = true, // Chạy nền kiểm soát chặt chẽ 4 nhóm mục tiêu
     val brightnessPercent: Int = 100, // 100% down to 68% for Toddler
     val isBedtimeOverlayVisible: Boolean = false,
     val isMovementStationActive: Boolean = false,
@@ -50,11 +88,42 @@ data class SessionState(
     val targetStretchReps: Int = 10,
     val isReflectionActive: Boolean = false,
     val reflectionCompleted: Boolean = false,
-    val currentAccelerationDelta: Float = 0f
+    val currentAccelerationDelta: Float = 0f,
+    val lastNotifiedLevel: Int = 0
 ) {
     val totalSeconds: Float get() = targetMinutes * 60f
-    val progress: Float get() = (elapsedSeconds / totalSeconds).coerceIn(0f, 1f)
-    val remainingSeconds: Int get() = ((totalSeconds - elapsedSeconds).coerceAtLeast(0f)).toInt()
+
+    val progress: Float
+        get() = decayLevelMode.forcedProgress ?: (elapsedSeconds / totalSeconds).coerceIn(0f, 1f)
+
+    val currentDecayLevel: Int
+        get() = when {
+            decayLevelMode != DecayLevelMode.AUTO -> decayLevelMode.levelNumber
+            progress >= 1.0f -> 4
+            progress >= 0.75f -> 3
+            progress >= 0.50f -> 2
+            progress >= 0.25f -> 1
+            else -> 0
+        }
+
+    val remainingSeconds: Int
+        get() = ((totalSeconds * (1f - progress)).coerceAtLeast(0f)).toInt()
+
+    // Ma sát nhận thức: Ẩn thông báo đỏ từ Mức 1+, ẩn số Like/View từ Mức 2+
+    val hideRedNotifications: Boolean get() = currentDecayLevel >= 1
+    val hideLikeAndViewCounts: Boolean get() = currentDecayLevel >= 2
+    val infiniteScrollDelayMs: Long
+        get() = when (currentDecayLevel) {
+            0, 1 -> 0L
+            2 -> 450L
+            else -> 900L
+        }
+
+    // Kiểm tra miễn giảm làm xám khi đang xem bài giảng học tập YouTube
+    val isGrayscaleExemptedNow: Boolean
+        get() = exemptYoutubeEducation &&
+                selectedPreviewPlatform == TargetPlatform.YOUTUBE_SHORTS &&
+                isViewingYoutubeLecture
 }
 
 data class ActivityRecord(
@@ -73,5 +142,5 @@ data class ParentalConfig(
     val middleSchoolMinutes: Int = 30,
     val accelerometerThreshold: Float = 6.5f,
     val requiredStretchReps: Int = 10,
-    val reflectionSentence: String = "Thời gian của mình là quý giá, mình chọn dừng lại để nghỉ ngơi và đọc sách."
+    val reflectionSentence: String = "Em hoàn thành bài tập Toán và đọc 10 trang sách khoa học trước khi giải trí."
 )
