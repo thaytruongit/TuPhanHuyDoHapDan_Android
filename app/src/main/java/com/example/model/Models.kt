@@ -33,7 +33,7 @@ enum class AgeGroup(
         ageRange = "10 – 12 tuổi",
         defaultMinutes = 30,
         mechanismName = "Ma sát nhận thức & Phản tư",
-        mechanismDescription = "Ẩn số Like/View/Thông báo đỏ, giảm độ bão hòa màu về trắng đen 100%, làm trễ cuộn vô tận (900 ms) và yêu cầu gõ mục tiêu học tập chống dán ở phút 30."
+        mechanismDescription = "Ẩn số Like/View/Thông báo đỏ, giảm độ bão hòa màu về trắng đen 100%, làm trễ cuộn vô tận (900 ms) và yêu cầu hoàn thành mục tiêu học tập (giải toán / gõ phản tư chống dán) ở phút 30."
     )
 }
 
@@ -68,6 +68,25 @@ enum class DecayLevelMode(
     LEVEL_4("Mức 4", 4, 1.0f, "Mức 4 (100%): Đạt giới hạn – Trắng đen 100%, phát Notification & kích hoạt khóa bắt buộc theo độ tuổi")
 }
 
+/**
+ * Loại hình mục tiêu học tập mà trẻ cần hoàn thành để mở khóa ứng dụng
+ */
+enum class LearningGoalType(
+    val title: String,
+    val subtitle: String
+) {
+    MATH_CHALLENGE("Giải bài toán tư duy", "Giải đúng đủ số bài toán (VD: 3 bài toán) để kích hoạt tư duy logic"),
+    TYPING_REFLECTION("Gõ cam kết học tập", "Tự tay gõ câu cam kết mục tiêu học tập (chống sao chép/dán)"),
+    COMBINED("Kết hợp Giải toán & Gõ mục tiêu", "Giải đúng các bài toán tư duy và gõ câu cam kết học tập")
+}
+
+data class MathProblem(
+    val index: Int,
+    val question: String,
+    val correctAnswer: Int,
+    val hint: String
+)
+
 data class SessionState(
     val ageGroup: AgeGroup = AgeGroup.MIDDLE_SCHOOL,
     val isRunning: Boolean = false,
@@ -88,6 +107,7 @@ data class SessionState(
     val targetStretchReps: Int = 10,
     val isReflectionActive: Boolean = false,
     val reflectionCompleted: Boolean = false,
+    val isLearningGoalSetupDialogVisible: Boolean = false,
     val currentAccelerationDelta: Float = 0f,
     val lastNotifiedLevel: Int = 0
 ) {
@@ -142,5 +162,8 @@ data class ParentalConfig(
     val middleSchoolMinutes: Int = 30,
     val accelerometerThreshold: Float = 6.5f,
     val requiredStretchReps: Int = 10,
-    val reflectionSentence: String = "Em hoàn thành bài tập Toán và đọc 10 trang sách khoa học trước khi giải trí."
+    val learningGoalTitle: String = "Giải 3 bài toán tư duy & Hoàn thành bài tập",
+    val requiredMathProblems: Int = 3,
+    val learningGoalType: LearningGoalType = LearningGoalType.COMBINED,
+    val reflectionSentence: String = "Em hoàn thành 3 bài toán và đọc 10 trang sách khoa học trước khi giải trí."
 )

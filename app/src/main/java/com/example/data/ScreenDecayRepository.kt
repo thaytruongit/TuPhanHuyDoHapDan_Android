@@ -2,6 +2,7 @@ package com.example.data
 
 import android.content.Context
 import com.example.model.ActivityRecord
+import com.example.model.LearningGoalType
 import com.example.model.ParentalConfig
 import com.example.util.CryptoUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,10 +29,22 @@ class ScreenDecayRepository(private val context: Context) {
         val middleMin = prefs.getInt("middle_min", 30)
         val threshold = prefs.getFloat("accel_threshold", 6.5f)
         val reps = prefs.getInt("stretch_reps", 10)
+        val goalTitle = prefs.getString(
+            "learning_goal_title",
+            "Giải 3 bài toán tư duy & Hoàn thành bài tập"
+        ) ?: "Giải 3 bài toán tư duy & Hoàn thành bài tập"
+        val mathCount = prefs.getInt("required_math_problems", 3)
+        val goalTypeName = prefs.getString("learning_goal_type", LearningGoalType.COMBINED.name)
+            ?: LearningGoalType.COMBINED.name
+        val goalType = try {
+            LearningGoalType.valueOf(goalTypeName)
+        } catch (_: Exception) {
+            LearningGoalType.COMBINED
+        }
         val reflection = prefs.getString(
             "reflection_sentence",
-            "Thời gian của mình là quý giá, mình chọn dừng lại để nghỉ ngơi và đọc sách."
-        ) ?: "Thời gian của mình là quý giá, mình chọn dừng lại để nghỉ ngơi và đọc sách."
+            "Em hoàn thành 3 bài toán và đọc 10 trang sách khoa học trước khi giải trí."
+        ) ?: "Em hoàn thành 3 bài toán và đọc 10 trang sách khoa học trước khi giải trí."
 
         return ParentalConfig(
             pinSha256 = pinSha256,
@@ -40,6 +53,9 @@ class ScreenDecayRepository(private val context: Context) {
             middleSchoolMinutes = middleMin,
             accelerometerThreshold = threshold,
             requiredStretchReps = reps,
+            learningGoalTitle = goalTitle,
+            requiredMathProblems = mathCount,
+            learningGoalType = goalType,
             reflectionSentence = reflection
         )
     }
@@ -52,6 +68,9 @@ class ScreenDecayRepository(private val context: Context) {
             .putInt("middle_min", newConfig.middleSchoolMinutes)
             .putFloat("accel_threshold", newConfig.accelerometerThreshold)
             .putInt("stretch_reps", newConfig.requiredStretchReps)
+            .putString("learning_goal_title", newConfig.learningGoalTitle)
+            .putInt("required_math_problems", newConfig.requiredMathProblems)
+            .putString("learning_goal_type", newConfig.learningGoalType.name)
             .putString("reflection_sentence", newConfig.reflectionSentence)
             .apply()
         _config.value = newConfig
@@ -112,7 +131,7 @@ class ScreenDecayRepository(private val context: Context) {
                 ageGroupName = "Nhóm 3 (10-12t)",
                 minutesSpent = 30,
                 completedSuccessfully = true,
-                notes = "Chuyển Grayscale 100%, gõ phản tư chống dán và rời máy tự giác."
+                notes = "Hoàn thành mục tiêu học tập: Giải đúng 3 bài toán & gõ phản tư chống dán."
             )
         )
     }
@@ -120,7 +139,7 @@ class ScreenDecayRepository(private val context: Context) {
     fun logSession(record: ActivityRecord) {
         val current = _activityLogs.value.toMutableList()
         current.add(0, record)
-        val trimmed = current.take(50) // keep latest 50
+        val trimmed = current.take(50)
         _activityLogs.value = trimmed
 
         try {

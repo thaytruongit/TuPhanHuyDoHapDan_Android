@@ -60,6 +60,7 @@ import com.example.hardware.HardwareManager
 import com.example.hardware.NotificationHelper
 import com.example.ui.ScreenDecayViewModel
 import com.example.ui.components.BearSleepDialog
+import com.example.ui.components.LearningGoalSetupDialog
 import com.example.ui.components.MovementStationDialog
 import com.example.ui.components.ParentPinDialog
 import com.example.ui.components.ReflectionFrictionDialog
@@ -269,6 +270,7 @@ fun MainAppContainer(
                         onToggleFastForward30x = { viewModel.toggleFastForward30x(it) },
                         onSelectDecayLevelMode = { viewModel.selectDecayLevelMode(it) },
                         onSendTestNotification = { viewModel.sendTestNotificationNow() },
+                        onOpenLearningGoalSetup = { viewModel.openLearningGoalSetupDialog() },
                         onPlayLullabyPreview = { viewModel.activateBedtimeDirectly() },
                         onTriggerMovementStationDirectly = { viewModel.activateMovementStationDirectly() },
                         onTriggerReflectionDirectly = { viewModel.activateReflectionDirectly() }
@@ -316,12 +318,24 @@ fun MainAppContainer(
                 )
             }
 
-            // 3. Nhóm 3 (10-12 tuổi): Cơ chế Ma sát nhận thức & Gõ mục tiêu học tập chống dán
+            // 3. Nhóm 3 (10-12 tuổi): Cơ chế Ma sát nhận thức & Hoàn thành mục tiêu học tập (VD: Giải 3 bài toán)
             if (sessionState.isReflectionActive) {
                 ReflectionFrictionDialog(
-                    targetSentence = config.reflectionSentence,
+                    config = config,
                     onSubmitReflection = { viewModel.submitReflection(it) },
+                    onOpenGoalSetup = { viewModel.openLearningGoalSetupDialog() },
                     onParentOverride = { showParentPinModal = true }
+                )
+            }
+
+            // Dialog Thiết lập mục tiêu học tập (ví dụ: giải 3 bài toán)
+            if (sessionState.isLearningGoalSetupDialogVisible) {
+                LearningGoalSetupDialog(
+                    currentConfig = config,
+                    onDismiss = { viewModel.closeLearningGoalSetupDialog() },
+                    onSaveGoal = { updatedConfig, launchNow ->
+                        viewModel.saveLearningGoalAndOptionallyTest(updatedConfig, launchNow)
+                    }
                 )
             }
 

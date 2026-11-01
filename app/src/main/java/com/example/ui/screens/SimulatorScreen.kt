@@ -496,19 +496,31 @@ fun TargetPlatformsControlCard(
                 }
             }
 
-            // Trạng thái dịch vụ chạy nền
+            // Trạng thái dịch vụ chạy nền trên hệ thống ngay cả khi tắt ứng dụng
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (sessionState.isBackgroundMonitorActive)
-                        "🟢 Dịch vụ chạy nền: Đang giám sát ${sessionState.enabledTargets.size}/4 nhóm mục tiêu"
-                    else
-                        "⚪ Dịch vụ chạy nền: Đang tạm dừng",
-                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF94A3B8))
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (sessionState.isBackgroundMonitorActive)
+                            "🟢 Chạy nền hệ thống (Hoạt động ngay cả khi tắt ứng dụng)"
+                        else
+                            "⚪ Dịch vụ chạy nền hệ thống: Đang tạm dừng",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = if (sessionState.isBackgroundMonitorActive) Color(0xFF34D399) else Color(0xFF94A3B8),
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = "Foreground Service (START_STICKY) giám sát ${sessionState.enabledTargets.size}/4 nhóm mục tiêu",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Color(0xFF94A3B8),
+                            fontSize = 10.sp
+                        )
+                    )
+                }
                 Switch(
                     checked = sessionState.isBackgroundMonitorActive,
                     onCheckedChange = onToggleBackgroundMonitor,
