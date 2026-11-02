@@ -49,7 +49,8 @@ import com.example.util.CryptoUtils
 fun ParentPinDialog(
     onDismiss: () -> Unit,
     onVerifyPin: (String) -> Boolean,
-    onSuccess: () -> Unit
+    onSuccess: () -> Unit,
+    reasonMessage: String = "Nhập mật khẩu Phụ huynh (Mã PIN) để huỷ chạy chương trình hoặc mở khóa cấu hình hệ thống."
 ) {
     var enteredPin by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
@@ -78,14 +79,14 @@ fun ParentPinDialog(
         },
         title = {
             Text(
-                text = "Xác Thực Phụ Huynh (SHA-256)",
+                text = "Mật Khẩu Phụ Huynh (SHA-256)",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Nhập mã PIN phụ huynh để can thiệp mở khóa hoặc cấu hình hệ thống.",
+                    text = reasonMessage,
                     style = MaterialTheme.typography.bodyMedium
                 )
 

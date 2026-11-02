@@ -10,6 +10,7 @@ import com.example.hardware.NotificationHelper
 import com.example.model.ActivityRecord
 import com.example.model.AgeGroup
 import com.example.model.DecayLevelMode
+import com.example.model.MonitoredGameTitle
 import com.example.model.ParentalConfig
 import com.example.model.SessionState
 import com.example.model.TargetPlatform
@@ -158,12 +159,44 @@ class ScreenDecayViewModel(
     fun toggleTargetPlatform(platform: TargetPlatform) {
         ScreenDecayBackgroundEngine.updateState { current ->
             val newSet = current.enabledTargets.toMutableSet()
+            val newGames = current.enabledGames.toMutableSet()
             if (newSet.contains(platform)) {
-                if (newSet.size > 1) newSet.remove(platform)
+                if (newSet.size > 1) {
+                    newSet.remove(platform)
+                    if (platform == TargetPlatform.WEB_GAME) {
+                        newGames.clear()
+                    }
+                }
             } else {
                 newSet.add(platform)
+                if (platform == TargetPlatform.WEB_GAME && newGames.isEmpty()) {
+                    newGames.addAll(MonitoredGameTitle.values())
+                }
             }
-            current.copy(enabledTargets = newSet)
+            current.copy(
+                enabledTargets = newSet,
+                enabledGames = newGames
+            )
+        }
+    }
+
+    fun toggleMonitoredGame(game: MonitoredGameTitle) {
+        ScreenDecayBackgroundEngine.updateState { current ->
+            val newGames = current.enabledGames.toMutableSet()
+            val newTargets = current.enabledTargets.toMutableSet()
+            if (newGames.contains(game)) {
+                newGames.remove(game)
+                if (newGames.isEmpty() && newTargets.size > 1) {
+                    newTargets.remove(TargetPlatform.WEB_GAME)
+                }
+            } else {
+                newGames.add(game)
+                newTargets.add(TargetPlatform.WEB_GAME)
+            }
+            current.copy(
+                enabledTargets = newTargets,
+                enabledGames = newGames
+            )
         }
     }
 
@@ -192,6 +225,34 @@ class ScreenDecayViewModel(
             ScreenDecayForegroundService.stopService(ctx)
             notificationHelper?.cancelBackgroundMonitorNotification()
         }
+    }
+
+    /**
+     * Tích bật để khởi chạy toàn bộ chương trình kiểm soát & chạy nền hệ thống
+     */
+    fun startProgramAndBackgroundMonitor() {
+        ScreenDecayBackgroundEngine.updateState { it.copy(isBackgroundMonitorActive = true) }
+        attachedActivity?.applicationContext?.let { ctx ->
+            ScreenDecayForegroundService.startOrUpdateService(ctx)
+        }
+        ScreenDecayBackgroundEngine.startTimer()
+    }
+
+    /**
+     * Huỷ/dừng chạy chương trình sau khi đã xác thực đúng mật khẩu Phụ huynh
+     */
+    fun stopProgramAfterParentVerified() {
+        ScreenDecayBackgroundEngine.pauseTimer()
+        ScreenDecayBackgroundEngine.updateState {
+            it.copy(
+                isRunning = false,
+                isBackgroundMonitorActive = false
+            )
+        }
+        attachedActivity?.applicationContext?.let { ctx ->
+            ScreenDecayForegroundService.stopService(ctx)
+        }
+        notificationHelper?.cancelBackgroundMonitorNotification()
     }
 
     fun toggleFastForward30x(enabled: Boolean) {

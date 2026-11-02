@@ -171,7 +171,13 @@ class NotificationHelper(private val context: Context) {
      * Tạo Notification dùng cho ForegroundService chạy ngầm trên hệ thống ngay cả khi tắt ứng dụng
      */
     fun buildForegroundMonitorNotification(sessionState: SessionState): Notification {
-        val activeTargets = sessionState.enabledTargets.joinToString(", ") { it.title }
+        val activeTargets = sessionState.enabledTargets.joinToString(", ") { platform ->
+            if (platform == com.example.model.TargetPlatform.WEB_GAME && sessionState.enabledGames.isNotEmpty()) {
+                "Game (${sessionState.enabledGames.joinToString("/") { it.title }})"
+            } else {
+                platform.title
+            }
+        }
         val remMin = sessionState.remainingSeconds / 60
         val remSec = sessionState.remainingSeconds % 60
         val statusLabel = if (sessionState.isRunning) "Đang đếm giờ" else "Đang giám sát"

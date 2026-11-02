@@ -183,6 +183,16 @@ fun MainAppContainer(
 
     var currentTab by remember { mutableStateOf(MainTab.SIMULATOR) }
     var showParentPinModal by remember { mutableStateOf(false) }
+    var pinModalReason by remember {
+        mutableStateOf("Nhập mật khẩu Phụ huynh (Mã PIN mặc định: 1234) để huỷ chạy chương trình hoặc mở khóa cấu hình hệ thống.")
+    }
+    var pendingPinProtectedAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun requestParentPinForAction(reason: String, action: () -> Unit) {
+        pinModalReason = reason
+        pendingPinProtectedAction = action
+        showParentPinModal = true
+    }
 
     BackHandler(enabled = currentTab != MainTab.SIMULATOR) {
         currentTab = MainTab.SIMULATOR
@@ -257,16 +267,90 @@ fun MainAppContainer(
                 MainTab.SIMULATOR -> {
                     SimulatorScreen(
                         sessionState = sessionState,
-                        onSelectAgeGroup = { viewModel.setAgeGroup(it) },
-                        onToggleRunning = { viewModel.toggleRunning() },
-                        onReset = { viewModel.resetSession() },
+                        onSelectAgeGroup = { group ->
+                            if (sessionState.isRunning) {
+                                requestParentPinForAction(
+                                    "Chương trình đang chạy. Nhập mật khẩu Phụ huynh (mặc định: 1234) để đổi nhóm độ tuổi."
+                                ) {
+                                    viewModel.setAgeGroup(group)
+                                }
+                            } else {
+                                viewModel.setAgeGroup(group)
+                            }
+                        },
+                        onToggleRunning = {
+                            if (sessionState.isRunning) {
+                                requestParentPinForAction(
+                                    "Chương trình đang chạy kiểm soát. Nhập mật khẩu Phụ huynh (mặc định: 1234) để huỷ hoặc tạm dừng chương trình."
+                                ) {
+                                    viewModel.stopProgramAfterParentVerified()
+                                }
+                            } else {
+                                viewModel.startProgramAndBackgroundMonitor()
+                            }
+                        },
+                        onReset = {
+                            if (sessionState.isRunning) {
+                                requestParentPinForAction(
+                                    "Chương trình đang chạy kiểm soát. Nhập mật khẩu Phụ huynh (mặc định: 1234) để huỷ và đặt lại bộ đếm."
+                                ) {
+                                    viewModel.resetSession()
+                                }
+                            } else {
+                                viewModel.resetSession()
+                            }
+                        },
                         onSetSpeed = { viewModel.setSpeedMultiplier(it) },
-                        onToggleTargetPlatform = { viewModel.toggleTargetPlatform(it) },
+                        onToggleTargetPlatform = { platform ->
+                            val isRemoving = sessionState.enabledTargets.contains(platform)
+                            if (sessionState.isRunning && isRemoving) {
+                                requestParentPinForAction(
+                                    "Chương trình đang chạy. Nhập mật khẩu Phụ huynh (mặc định: 1234) để bỏ giám sát ${platform.title}."
+                                ) {
+                                    viewModel.toggleTargetPlatform(platform)
+                                }
+                            } else {
+                                viewModel.toggleTargetPlatform(platform)
+                            }
+                        },
+                        onToggleMonitoredGame = { game ->
+                            val isRemoving = sessionState.enabledGames.contains(game)
+                            if (sessionState.isRunning && isRemoving) {
+                                requestParentPinForAction(
+                                    "Chương trình đang chạy. Nhập mật khẩu Phụ huynh (mặc định: 1234) để bỏ kiểm soát game ${game.title}."
+                                ) {
+                                    viewModel.toggleMonitoredGame(game)
+                                }
+                            } else {
+                                viewModel.toggleMonitoredGame(game)
+                            }
+                        },
                         onSelectPreviewPlatform = { platform, isLecture ->
                             viewModel.selectPreviewPlatform(platform, isLecture)
                         },
                         onToggleExemptYoutubeEducation = { viewModel.toggleExemptYoutubeEducation(it) },
-                        onToggleBackgroundMonitor = { viewModel.toggleBackgroundMonitor(it) },
+                        onToggleBackgroundMonitor = { active ->
+                            if (!active) {
+                                requestParentPinForAction(
+                                    "Nhập mật khẩu Phụ huynh (mặc định: 1234) để huỷ dịch vụ chạy nền hệ thống."
+                                ) {
+                                    viewModel.stopProgramAfterParentVerified()
+                                }
+                            } else {
+                                viewModel.toggleBackgroundMonitor(true)
+                            }
+                        },
+                        onToggleProgramRunProtected = { shouldRun ->
+                            if (shouldRun) {
+                                viewModel.startProgramAndBackgroundMonitor()
+                            } else {
+                                requestParentPinForAction(
+                                    "Chương trình đang chạy kiểm soát. Vui lòng nhập mật khẩu Phụ huynh (Mã PIN mặc định: 1234) để huỷ chạy chương trình."
+                                ) {
+                                    viewModel.stopProgramAfterParentVerified()
+                                }
+                            }
+                        },
                         onToggleFastForward30x = { viewModel.toggleFastForward30x(it) },
                         onSelectDecayLevelMode = { viewModel.selectDecayLevelMode(it) },
                         onSendTestNotification = { viewModel.sendTestNotificationNow() },
@@ -302,7 +386,11 @@ fun MainAppContainer(
             if (sessionState.isBedtimeOverlayVisible) {
                 BearSleepDialog(
                     onDismiss = { viewModel.dismissBedtimeOverlay() },
-                    onParentOverride = { showParentPinModal = true }
+                    onParentOverride = {
+                        requestParentPinForAction(
+                            "Nhập mật khẩu Phụ huynh (mặc định: 1234) để tắt màn hình Bạn Gấu đi ngủ."
+                        ) {}
+                    }
                 )
             }
 
@@ -314,7 +402,11 @@ fun MainAppContainer(
                     repsDone = stretchReps,
                     targetReps = sessionState.targetStretchReps,
                     onSimulateRep = { viewModel.simulateManualRep() },
-                    onParentOverride = { showParentPinModal = true }
+                    onParentOverride = {
+                        requestParentPinForAction(
+                            "Nhập mật khẩu Phụ huynh (mặc định: 1234) để mở khóa Trạm vận động."
+                        ) {}
+                    }
                 )
             }
 
@@ -324,7 +416,11 @@ fun MainAppContainer(
                     config = config,
                     onSubmitReflection = { viewModel.submitReflection(it) },
                     onOpenGoalSetup = { viewModel.openLearningGoalSetupDialog() },
-                    onParentOverride = { showParentPinModal = true }
+                    onParentOverride = {
+                        requestParentPinForAction(
+                            "Nhập mật khẩu Phụ huynh (mặc định: 1234) để bỏ qua khóa Ma sát nhận thức."
+                        ) {}
+                    }
                 )
             }
 
@@ -342,9 +438,17 @@ fun MainAppContainer(
             // Xác thực Mã PIN Phụ Huynh (SHA-256)
             if (showParentPinModal) {
                 ParentPinDialog(
-                    onDismiss = { showParentPinModal = false },
+                    onDismiss = {
+                        pendingPinProtectedAction = null
+                        showParentPinModal = false
+                    },
                     onVerifyPin = { viewModel.unlockWithParentPin(it) },
-                    onSuccess = { showParentPinModal = false }
+                    onSuccess = {
+                        pendingPinProtectedAction?.invoke()
+                        pendingPinProtectedAction = null
+                        showParentPinModal = false
+                    },
+                    reasonMessage = pinModalReason
                 )
             }
         }

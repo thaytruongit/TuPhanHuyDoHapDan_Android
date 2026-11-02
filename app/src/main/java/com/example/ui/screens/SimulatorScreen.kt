@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -88,6 +89,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.AgeGroup
 import com.example.model.DecayLevelMode
+import com.example.model.MonitoredGameTitle
 import com.example.model.SessionState
 import com.example.model.TargetPlatform
 import com.example.ui.components.VisualDecayHelper
@@ -105,9 +107,11 @@ fun SimulatorScreen(
     onReset: () -> Unit,
     onSetSpeed: (Float) -> Unit,
     onToggleTargetPlatform: (TargetPlatform) -> Unit,
+    onToggleMonitoredGame: (MonitoredGameTitle) -> Unit = {},
     onSelectPreviewPlatform: (TargetPlatform, Boolean) -> Unit,
     onToggleExemptYoutubeEducation: (Boolean) -> Unit,
     onToggleBackgroundMonitor: (Boolean) -> Unit,
+    onToggleProgramRunProtected: (Boolean) -> Unit = {},
     onToggleFastForward30x: (Boolean) -> Unit,
     onSelectDecayLevelMode: (DecayLevelMode) -> Unit,
     onSendTestNotification: () -> Unit,
@@ -186,8 +190,10 @@ fun SimulatorScreen(
             TargetPlatformsControlCard(
                 sessionState = sessionState,
                 onToggleTargetPlatform = onToggleTargetPlatform,
+                onToggleMonitoredGame = onToggleMonitoredGame,
                 onToggleExemptYoutubeEducation = onToggleExemptYoutubeEducation,
                 onToggleBackgroundMonitor = onToggleBackgroundMonitor,
+                onToggleProgramRunProtected = onToggleProgramRunProtected,
                 onSendTestNotification = onSendTestNotification
             )
         }
@@ -250,8 +256,13 @@ fun SimulatorScreen(
             ) {
                 Text(
                     text = "Màn Hình Mô Phỏng Tự Phân Hủy:",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Text(
                     text = when (sessionState.ageGroup) {
@@ -261,6 +272,8 @@ fun SimulatorScreen(
                     },
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .clickable {
@@ -348,12 +361,15 @@ fun SimulatorScreen(
 /**
  * Giao diện Kiểm soát chạy nền 4 nhóm mục tiêu & Miễn giảm làm xám bài giảng YouTube (Giống hình 1)
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TargetPlatformsControlCard(
     sessionState: SessionState,
     onToggleTargetPlatform: (TargetPlatform) -> Unit,
+    onToggleMonitoredGame: (MonitoredGameTitle) -> Unit = {},
     onToggleExemptYoutubeEducation: (Boolean) -> Unit,
     onToggleBackgroundMonitor: (Boolean) -> Unit,
+    onToggleProgramRunProtected: (Boolean) -> Unit = {},
     onSendTestNotification: () -> Unit
 ) {
     Card(
@@ -366,54 +382,99 @@ fun TargetPlatformsControlCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Tiêu đề rộng rãi trên 1 hàng riêng biệt để không bị ép chữ dọc
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = null,
-                        tint = Color(0xFF38BDF8),
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "2. KIỂM SOÁT CHẠY NỀN 4 NHÓM MỤC TIÊU",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            color = Color(0xFF38BDF8),
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = Color(0xFF38BDF8),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "2. KIỂM SOÁT CHẠY NỀN 4 NHÓM MỤC TIÊU",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        color = Color(0xFF38BDF8),
+                        fontWeight = FontWeight.ExtraBold
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-                // Nút gửi thử Local Notification ngay lập tức
-                Surface(
-                    color = Color(0xFF1E3A8A),
-                    shape = RoundedCornerShape(8.dp),
+            // Nút tích bật để chạy chương trình (Muốn huỷ thì phải có mật khẩu phụ huynh)
+            Surface(
+                color = if (sessionState.isRunning) Color(0xFF064E3B) else Color(0xFF1E293B),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(
+                    1.5.dp,
+                    if (sessionState.isRunning) Color(0xFF10B981) else Color(0xFF38BDF8)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleProgramRunProtected(!sessionState.isRunning) }
+                    .testTag("card_run_program_protected")
+            ) {
+                Row(
                     modifier = Modifier
-                        .clickable { onSendTestNotification() }
-                        .testTag("btn_test_local_notification")
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.NotificationsActive,
+                            imageVector = if (sessionState.isRunning) Icons.Default.Lock else Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = Color(0xFF7DD3FC),
-                            modifier = Modifier.size(14.dp)
+                            tint = if (sessionState.isRunning) Color(0xFF34D399) else Color(0xFF38BDF8),
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Bắn Notification",
-                            color = Color(0xFFE0F2FE),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (sessionState.isRunning) {
+                                    "Đang chạy chương trình kiểm soát (Đã bật)"
+                                } else {
+                                    "Tích bật để chạy chương trình kiểm soát"
+                                },
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            )
+                            Text(
+                                text = if (sessionState.isRunning) {
+                                    "🔒 Muốn huỷ / bỏ tích bắt buộc phải nhập mật khẩu Phụ huynh"
+                                } else {
+                                    "Chạm tích vào ô bên phải để bắt đầu chạy (Huỷ cần mật khẩu Phụ huynh)"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (sessionState.isRunning) Color(0xFFA7F3D0) else Color(0xFF94A3B8),
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Checkbox(
+                        checked = sessionState.isRunning,
+                        onCheckedChange = { onToggleProgramRunProtected(it) },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color(0xFF10B981),
+                            checkmarkColor = Color(0xFF0F172A),
+                            uncheckedColor = Color(0xFF38BDF8)
+                        ),
+                        modifier = Modifier.testTag("checkbox_run_program_protected")
+                    )
                 }
             }
 
@@ -453,6 +514,80 @@ fun TargetPlatformsControlCard(
                     onToggle = { onToggleTargetPlatform(TargetPlatform.WEB_GAME) },
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Kiểm soát chi tiết nhóm Game (Roblox, Free Fire, Liên Quân,...) bên cạnh YouTube, TikTok, Facebook
+            Surface(
+                color = Color(0xFF131C31),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "🎮 Kiểm soát nhóm Game (${sessionState.enabledGames.size}/${MonitoredGameTitle.values().size} tựa game đang bật):",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Color(0xFF93C5FD),
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        MonitoredGameTitle.values().forEach { game ->
+                            val isGameChecked = sessionState.enabledGames.contains(game) &&
+                                    sessionState.enabledTargets.contains(TargetPlatform.WEB_GAME)
+                            Surface(
+                                color = if (isGameChecked) Color(0xFF1E3A8A) else Color(0xFF0F172A),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isGameChecked) Color(0xFF60A5FA) else Color(0xFF334155)
+                                ),
+                                modifier = Modifier
+                                    .clickable { onToggleMonitoredGame(game) }
+                                    .testTag("game_chip_${game.name.lowercase()}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = game.emoji, fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = game.title,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = if (isGameChecked) Color.White else Color(0xFF94A3B8),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (isGameChecked) Color(0xFF60A5FA) else Color(0xFF334155)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isGameChecked) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color(0xFF0F172A),
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Hàng 3: Miễn giảm làm xám cho bài giảng học tập YouTube
@@ -498,7 +633,7 @@ fun TargetPlatformsControlCard(
                 }
             }
 
-            // Trạng thái dịch vụ chạy nền trên hệ thống ngay cả khi tắt ứng dụng
+            // Trạng thái dịch vụ chạy nền trên hệ thống ngay cả khi tắt ứng dụng + Nút bắn thử Notification
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -523,11 +658,46 @@ fun TargetPlatformsControlCard(
                         )
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Switch(
                     checked = sessionState.isBackgroundMonitorActive,
                     onCheckedChange = onToggleBackgroundMonitor,
                     modifier = Modifier.testTag("switch_bg_monitor")
                 )
+            }
+
+            // Nút gửi thử Local Notification nằm ngang gọn gàng, không bao giờ bị ép chữ dọc
+            Surface(
+                color = Color(0xFF1E3A8A),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSendTestNotification() }
+                    .testTag("btn_test_local_notification")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        tint = Color(0xFF7DD3FC),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Bắn thử thông báo nhắc nhở (Local Notification)",
+                        color = Color(0xFFE0F2FE),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -833,12 +1003,12 @@ fun ScientificHudCard(
                         modifier = Modifier.testTag("btn_toggle_running")
                     ) {
                         Icon(
-                            imageVector = if (sessionState.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            imageVector = if (sessionState.isRunning) Icons.Default.Lock else Icons.Default.PlayArrow,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (sessionState.isRunning) "Tạm dừng" else "Chạy bộ đếm")
+                        Text(if (sessionState.isRunning) "Huỷ / Dừng (Cần PIN)" else "Chạy bộ đếm")
                     }
 
                     OutlinedButton(
@@ -1027,8 +1197,21 @@ fun SimulatedTargetPlatformFeed(
                         Triple("Tổng hợp clip thú cưng siêu đáng yêu", "Pet Lovers VN • Thuật toán giữ chân người xem", "134.9K ❤️ • 1.7M lượt xem")
                     )
                     TargetPlatform.WEB_GAME -> listOf(
-                        Triple("Đấu Trường Kẹo Ngọt Siêu Cấp (Candy Blitz)", "Combo nổ màu sắc liên hoàn & phần thưởng vòng quay", "890.2K ❤️ • 12.5M lượt chơi"),
-                        Triple("Đua Xe Neon Tốc Độ Cao 3D", "Bảng xếp hạng trực tuyến & rương vật phẩm lấp lánh", "410.6K ❤️ • 5.3M lượt chơi")
+                        Triple(
+                            "🧱 Roblox: Blox Fruits & Brookhaven RP (Đang kiểm soát)",
+                            "Tự phân hủy màu neon trái Ác Quỷ, ẩn thông báo sự kiện đỏ & giảm kích thích thị giác",
+                            "980.5K ❤️ • 15.2M người chơi online"
+                        ),
+                        Triple(
+                            "🔥 Garena Free Fire: Sinh Tồn & Vòng Quay Kim Cương",
+                            "Làm mờ hiệu ứng rương súng rực rỡ, ẩn huy hiệu chuỗi thắng gây nghiện",
+                            "742.1K ❤️ • 9.8M người chơi online"
+                        ),
+                        Triple(
+                            "⚔️ Liên Quân Mobile: Đấu Xếp Hạng 5v5 & Sự Kiện Skin SS",
+                            "Hạ nhiệt màu sắc giao diện sảnh chờ, nhắc nghỉ mắt & vươn vai sau mỗi trận",
+                            "635.8K ❤️ • 8.4M người chơi online"
+                        )
                     )
                 }
             }

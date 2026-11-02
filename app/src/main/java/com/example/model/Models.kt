@@ -38,17 +38,37 @@ enum class AgeGroup(
 }
 
 /**
- * 4 Nhóm mục tiêu kiểm soát chạy nền
+ * Danh sách các tựa Game phổ biến được kiểm soát chặt chẽ
+ */
+enum class MonitoredGameTitle(
+    val title: String,
+    val emoji: String,
+    val packageName: String
+) {
+    ROBLOX("Roblox", "🧱", "com.roblox.client"),
+    FREE_FIRE("Free Fire", "🔥", "com.dts.freefireth"),
+    LIEN_QUAN("Liên Quân", "⚔️", "com.garena.game.kgvn"),
+    OTHER_GAMES("Play Together / Khác", "🕹️", "com.haegin.playtogether")
+}
+
+/**
+ * 4 Nhóm mục tiêu kiểm soát chạy nền (YouTube, TikTok, Facebook, Game: Roblox, Free Fire, Liên Quân,...)
  */
 enum class TargetPlatform(
     val title: String,
     val emoji: String,
-    val packageHint: String
+    val packageHint: String,
+    val subtitleHint: String = ""
 ) {
-    YOUTUBE_SHORTS("YouTube & Shorts", "▶️", "com.google.android.youtube"),
-    TIKTOK_WEB("TikTok Web", "🎵", "com.zhiliaoapp.musically"),
-    FACEBOOK_REELS("Facebook & Reels", "📘", "com.facebook.katana"),
-    WEB_GAME("Web Game", "🎮", "web.game.portal")
+    YOUTUBE_SHORTS("YouTube & Shorts", "▶️", "com.google.android.youtube", "Video ngắn & Kênh giải trí"),
+    TIKTOK_WEB("TikTok", "🎵", "com.zhiliaoapp.musically", "TikTok App & TikTok Web"),
+    FACEBOOK_REELS("Facebook & Reels", "📘", "com.facebook.katana", "Bảng tin & Reels vô tận"),
+    WEB_GAME(
+        "Game (Roblox, FF, LQ...)",
+        "🎮",
+        "com.roblox.client, com.dts.freefireth, com.garena.game.kgvn",
+        "Roblox, Free Fire, Liên Quân,..."
+    )
 }
 
 /**
@@ -96,6 +116,7 @@ data class SessionState(
     val isFastForward30x: Boolean = false, // Tua nhanh thời gian (1s = 30s)
     val decayLevelMode: DecayLevelMode = DecayLevelMode.AUTO,
     val enabledTargets: Set<TargetPlatform> = TargetPlatform.values().toSet(),
+    val enabledGames: Set<MonitoredGameTitle> = MonitoredGameTitle.values().toSet(),
     val selectedPreviewPlatform: TargetPlatform = TargetPlatform.YOUTUBE_SHORTS,
     val exemptYoutubeEducation: Boolean = true, // Miễn giảm làm xám cho bài giảng học tập YouTube
     val isViewingYoutubeLecture: Boolean = false, // Đang xem bài giảng học tập trên YouTube
