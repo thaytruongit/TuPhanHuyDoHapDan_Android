@@ -51,6 +51,12 @@ jobs:
             fi
           fi
 
+      - name: Accept Android SDK Licenses
+        run: |
+          if [ -n "$ANDROID_HOME" ] && [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          fi
+
       - name: Run Unit Tests
         run: gradle :app:testDebugUnitTest --no-daemon
 
@@ -60,6 +66,6 @@ jobs:
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HaNhietManHinh-debug-apk
+          name: TuPhanHuyDoHapDan-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error

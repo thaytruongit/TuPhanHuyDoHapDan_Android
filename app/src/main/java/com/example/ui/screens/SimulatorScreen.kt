@@ -111,6 +111,7 @@ fun SimulatorScreen(
     onToggleFastForward30x: (Boolean) -> Unit,
     onSelectDecayLevelMode: (DecayLevelMode) -> Unit,
     onSendTestNotification: () -> Unit,
+    onOpenLearningGoalSetup: () -> Unit = {},
     onPlayLullabyPreview: () -> Unit,
     onTriggerMovementStationDirectly: () -> Unit,
     onTriggerReflectionDirectly: () -> Unit,
@@ -336,7 +337,8 @@ fun SimulatorScreen(
                             }
                         }
                     },
-                    onOpenLearningGoalModal = onTriggerReflectionDirectly
+                    onOpenLearningGoalModal = onTriggerReflectionDirectly,
+                    onOpenLearningGoalSetup = onOpenLearningGoalSetup
                 )
             }
         }
@@ -904,7 +906,8 @@ fun SimulatedTargetPlatformFeed(
     extraFeedCount: Int,
     isLoadingMoreFeed: Boolean,
     onLoadMoreInfiniteScroll: () -> Unit,
-    onOpenLearningGoalModal: () -> Unit
+    onOpenLearningGoalModal: () -> Unit,
+    onOpenLearningGoalSetup: () -> Unit = {}
 ) {
     val platform = sessionState.selectedPreviewPlatform
     val isLecture = sessionState.isViewingYoutubeLecture
@@ -1198,6 +1201,18 @@ fun SimulatedTargetPlatformFeed(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Gõ Mục Tiêu Học Tập", fontSize = 12.sp)
             }
+        }
+
+        OutlinedButton(
+            onClick = onOpenLearningGoalSetup,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("btn_open_learning_goal_setup")
+        ) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Thiết lập Mục tiêu Học tập & Giải Toán (Ma sát nhận thức)", fontSize = 12.sp)
         }
     }
 }

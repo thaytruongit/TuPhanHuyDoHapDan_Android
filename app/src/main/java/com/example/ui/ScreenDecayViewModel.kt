@@ -330,6 +330,29 @@ class ScreenDecayViewModel(
         ScreenDecayBackgroundEngine.triggerAgeLimitReached(AgeGroup.MIDDLE_SCHOOL)
     }
 
+    fun openLearningGoalSetupDialog() {
+        ScreenDecayBackgroundEngine.updateState {
+            it.copy(isLearningGoalSetupDialogVisible = true)
+        }
+    }
+
+    fun closeLearningGoalSetupDialog() {
+        ScreenDecayBackgroundEngine.updateState {
+            it.copy(isLearningGoalSetupDialogVisible = false)
+        }
+    }
+
+    fun saveLearningGoalAndOptionallyTest(updatedConfig: ParentalConfig, launchNow: Boolean) {
+        repository.saveConfig(updatedConfig)
+        updateTargetMinutesForCurrentGroup()
+        ScreenDecayBackgroundEngine.updateState {
+            it.copy(isLearningGoalSetupDialogVisible = false)
+        }
+        if (launchNow) {
+            activateReflectionDirectly()
+        }
+    }
+
     fun activateBedtimeDirectly() {
         setAgeGroup(AgeGroup.TODDLER)
         ScreenDecayBackgroundEngine.triggerAgeLimitReached(AgeGroup.TODDLER)
