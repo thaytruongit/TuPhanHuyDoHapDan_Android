@@ -1,8 +1,0 @@
-{
-  "name": "Tự Phân Hủy Độ Hấp Dẫn",
-  "description": "Hệ thống tự phân hủy độ hấp dẫn đa nền tảng điều chỉnh hành vi sử dụng màn hình quá mức cho trẻ 3-12 tuổi theo 3 nhóm cơ chế khoa học.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

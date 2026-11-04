@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="vn.khkt.dopaminedecay">
+
+    <!-- Quyền mạng cho Kén trình duyệt WebView nội bộ -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Quyền vẽ Lớp phủ bộ lọc màu & Màn chắn khóa cứng Mức 4 đè lên mọi App -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Quyền chạy Dịch vụ nền liên tục (Foreground Service Android 8 -> 15) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Quyền phát hiện chính xác 100% ứng dụng đang mở (UsageStatsManager) -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Quyền nhìn thấy danh sách toàn bộ gói ứng dụng YouTube, TikTok, Facebook, Roblox trên Android 11+ (API 30+) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <!-- Quyền tự khởi chạy lại khi bật máy & bỏ qua tối ưu hóa pin (Chống đóng băng ngầm) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Quyền điều tiết hạ âm lượng & tắt tiếng khi khóa Mức 4 -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Quyền tùy chọn bật Thang độ xám phần cứng (Daltonizer) nếu được cấp qua ADB -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Khai báo tường minh các gói mục tiêu cho Android 11/12/13/14/15 -->
+    <queries>
+        <!-- YouTube & biến thể -->
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.google.android.apps.youtube.kids" />
+        <package android:name="com.google.android.apps.youtube.music" />
+        <package android:name="app.revanced.android.youtube" />
+        <!-- TikTok & biến thể -->
+        <package android:name="com.ss.android.ugc.trill" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.zhiliaoapp.musically.go" />
+        <package android:name="com.ss.android.ugc.trill.go" />
+        <package android:name="com.ss.android.ugc.aweme" />
+        <!-- Facebook & biến thể -->
+        <package android:name="com.facebook.katana" />
+        <package android:name="com.facebook.lite" />
+        <package android:name="com.facebook.orca" />
+        <package android:name="com.facebook.mlite" />
+        <!-- Roblox & Trò chơi trực tuyến -->
+        <package android:name="com.roblox.client" />
+        <package android:name="com.dts.freefireth" />
+        <package android:name="com.garena.game.kgvn" />
+        <package android:name="com.mojang.minecraftpe" />
+        <package android:name="com.supercell.brawlstars" />
+        <!-- Các trình duyệt di động chạy Web Game / Roblox / YouTube Web -->
+        <package android:name="com.android.chrome" />
+        <package android:name="com.sec.android.app.sbrowser" />
+        <package android:name="org.mozilla.firefox" />
+        <package android:name="com.microsoft.emmx" />
+        <package android:name="com.coccoc.trinhduyet" />
+        <package android:name="com.opera.browser" />
+        <package android:name="com.brave.browser" />
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+
+        <!-- Màn hình Bảng điều khiển Trung tâm (Giao diện Sáng, Khóa mật khẩu Phụ huynh 666666) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Màn hình Kén Trình Duyệt & Web Game Kiểm Soát Trực Tiếp (YouTube, TikTok, FB, Roblox Web) -->
+        <activity
+            android:name=".SafeCocoonActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <!-- DỊCH VỤ CHẠY NỀN NGHIÊM NGẶT: Giám sát đa tầng 250ms & Thực thi Bộ lọc + Khóa cứng Mức 4 -->
+        <service
+            android:name=".DopamineMonitorService"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="specialUse"
+            tools:targetApi="upside_down_cake">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="parental_control_screen_time_intervention" />
+        </service>
+
+        <!-- DỊCH VỤ TRỢ NĂNG TOÀN CỤC: Bắt tức thì mọi sự kiện mở App, đọc URL Web Game & Chặn vượt rào -->
+        <service
+            android:name=".DopamineAccessibilityService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="Tự Phân Huỷ Độ Hấp Dẫn - Kiểm soát chặt chẽ"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.view.accessibility.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- BỘ THU TỰ KHỞI CHẠY KHI BẬT MÁY HOẶC HỒI SINH DỊCH VỤ -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="vn.khkt.dopaminedecay.ACTION_REVIVE_SERVICE" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>
