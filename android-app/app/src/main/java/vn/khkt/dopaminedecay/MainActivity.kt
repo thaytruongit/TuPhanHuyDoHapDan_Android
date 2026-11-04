@@ -56,8 +56,7 @@ class MainActivity : Activity() {
 
         // 1. HEADER
         val title = TextView(this).apply {
-            text = "🛡️ TỰ PHÂN HUỶ ĐỘ HẤP DẪN MÀN HÌNH
-Hệ thống Kiểm Soát Nghiêm Ngặt (Android V8)"
+            text = "🛡️ TỰ PHÂN HUỶ ĐỘ HẤP DẪN MÀN HÌNH\nHệ thống Kiểm Soát Nghiêm Ngặt (Android V8)"
             textSize = 17.5f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.parseColor("#0F172A"))
@@ -298,8 +297,7 @@ Hệ thống Kiểm Soát Nghiêm Ngặt (Android V8)"
 
         // 7. TUỲ CHỌN ĐỘ TUỔI & 4 ỨNG DỤNG CHỈ ĐỊNH (Không cần mật khẩu khi tùy chọn)
         val optHeader = TextView(this).apply {
-            text = "
-🎯 TUỲ CHỌN NHÓM TUỔI & 4 ỨNG DỤNG CHỈ ĐỊNH:"
+            text = "\n🎯 TUỲ CHỌN NHÓM TUỔI & 4 ỨNG DỤNG CHỈ ĐỊNH:"
             textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.parseColor("#1E293B"))
@@ -377,8 +375,7 @@ Hệ thống Kiểm Soát Nghiêm Ngặt (Android V8)"
         }
 
         if (isRunning && hasOverlay && (hasUsage || hasAcc)) {
-            statusBanner.text = "🟢 HỆ THỐNG ĐANG CHẠY NỀN KIỂM SOÁT CHẶT CHẼ
-(YouTube • TikTok • Facebook • Roblox / Web Game)"
+            statusBanner.text = "🟢 HỆ THỐNG ĐANG CHẠY NỀN KIỂM SOÁT CHẶT CHẼ\n(YouTube • TikTok • Facebook • Roblox / Web Game)"
             (statusBanner.background as? GradientDrawable)?.setColor(Color.parseColor("#059669"))
             btnMainToggle.text = "🔒 TẮT CHƯƠNG TRÌNH (YÊU CẦU MẬT KHẨU PHỤ HUYNH)"
             btnMainToggle.setBackgroundColor(Color.parseColor("#DC2626"))

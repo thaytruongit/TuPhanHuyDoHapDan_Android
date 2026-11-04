@@ -467,8 +467,7 @@ class DopamineMonitorService : Service(), SensorEventListener {
 
         try {
             val orb = TextView(this).apply {
-                text = "M0
-0s"
+                text = "M0\n0s"
                 textSize = 11.5f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.WHITE)
@@ -546,8 +545,7 @@ class DopamineMonitorService : Service(), SensorEventListener {
         ensureFloatingOrbCreated()
         val orb = floatingOrbView ?: return
         orb.visibility = View.VISIBLE
-        orb.text = "M$level
-${activeSeconds.toInt()}s"
+        orb.text = "M$level\n${activeSeconds.toInt()}s"
 
         val bgColor = when (level) {
             0 -> "#10B981" // Xanh lá
@@ -758,9 +756,7 @@ ${activeSeconds.toInt()}s"
             setTextColor(Color.parseColor("#CBD5E1"))
             gravity = Gravity.CENTER
             setPadding(0, 16, 0, 24)
-            text = "Ứng dụng $catName đã bị khóa hoàn toàn để bảo vệ mắt và não bộ. Trẻ không thể tự tải lại hay đặt lại từ đầu.
-
-Phụ huynh vui lòng nhập mật khẩu (666666) nếu muốn mở khóa và đặt lại thời gian:"
+            text = "Ứng dụng $catName đã bị khóa hoàn toàn để bảo vệ mắt và não bộ. Trẻ không thể tự tải lại hay đặt lại từ đầu.\n\nPhụ huynh vui lòng nhập mật khẩu (666666) nếu muốn mở khóa và đặt lại thời gian:"
         }
         root.addView(descView)
 

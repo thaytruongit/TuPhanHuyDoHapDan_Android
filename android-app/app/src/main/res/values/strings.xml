@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tự Phân Hủy Độ Hấp Dẫn</string>
+    <string name="accessibility_service_description">Dịch vụ trợ năng của Tự Phân Hủy Độ Hấp Dẫn: nhận biết ứng dụng giải trí đang mở (YouTube, TikTok, Facebook, Roblox) và đếm thao tác cuộn để giảm dần độ hấp dẫn của màn hình, giúp trẻ 3–12 tuổi tự điều chỉnh thời gian sử dụng. Ứng dụng không thu thập, lưu trữ hay gửi nội dung màn hình ra ngoài.</string>
+</resources>
